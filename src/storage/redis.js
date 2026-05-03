@@ -8,6 +8,7 @@ const redisOptions = {
   maxRetriesPerRequest: 1,
   enableReadyCheck: true,
   lazyConnect: true,
+  password: config.redisPassword || undefined,
   retryStrategy(times) {
     if (times > 10) return null;
     return Math.min(times * 250, 2000);

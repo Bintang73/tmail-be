@@ -31,7 +31,14 @@ X-Admin-Token: change-me-admin-token
 Pastikan Redis aktif:
 
 ```bash
-redis-server
+redis-server --requirepass d0535500cb173f97
+```
+
+Konfigurasi Redis default:
+
+```env
+REDIS_PASSWORD=d0535500cb173f97
+REDIS_URL=redis://:d0535500cb173f97@127.0.0.1:6379
 ```
 
 Jalankan semua service development:
@@ -41,6 +48,7 @@ bun dev
 ```
 
 Command ini menjalankan Redis jika `redis-server` tersedia. Jika tidak, command akan mencoba menjalankan Docker container `redis:7-alpine`. Setelah itu API, worker cleanup, dan Haraka ikut dijalankan. Port Haraka dibaca dari `HARAKA_SMTP_PORT` di `.env`.
+Redis dev akan dijalankan dengan `requirepass` dari `REDIS_PASSWORD`.
 
 Jika muncul pesan Redis belum tersedia dan Docker juga tidak siap, install Redis dulu:
 

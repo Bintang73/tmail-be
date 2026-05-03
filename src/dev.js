@@ -9,6 +9,7 @@ dotenv.config();
 const processes = [];
 const redisHost = process.env.REDIS_HOST || '127.0.0.1';
 const redisPort = Number.parseInt(process.env.REDIS_PORT || '6379', 10);
+const redisPassword = process.env.REDIS_PASSWORD || 'd0535500cb173f97';
 const redisContainerName = process.env.REDIS_CONTAINER_NAME || 'tmail-redis-dev';
 const harakaBin = path.join(process.cwd(), 'node_modules/.bin/haraka');
 
@@ -81,7 +82,16 @@ const commandSucceeds = (command, args) =>
 
 if (!(await canConnect(redisHost, redisPort))) {
   if (await commandExists('redis-server')) {
-    run('redis', 'redis-server', ['--port', String(redisPort), '--save', '', '--appendonly', 'no']);
+    run('redis', 'redis-server', [
+      '--port',
+      String(redisPort),
+      '--requirepass',
+      redisPassword,
+      '--save',
+      '',
+      '--appendonly',
+      'no'
+    ]);
     await new Promise((resolve) => setTimeout(resolve, 600));
   } else if (await commandExists('docker')) {
     if (!(await commandSucceeds('docker', ['info']))) {
@@ -98,7 +108,10 @@ if (!(await canConnect(redisHost, redisPort))) {
       redisContainerName,
       '-p',
       `${redisPort}:6379`,
-      'redis:7-alpine'
+      'redis:7-alpine',
+      'redis-server',
+      '--requirepass',
+      redisPassword
     ], { fatal: false });
     await new Promise((resolve) => setTimeout(resolve, 1500));
   } else {
