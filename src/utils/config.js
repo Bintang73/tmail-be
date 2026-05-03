@@ -1,0 +1,28 @@
+import dotenv from 'dotenv';
+import path from 'node:path';
+
+dotenv.config();
+
+const toInt = (value, fallback) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const rootDir = process.cwd();
+
+export const config = {
+  nodeEnv: process.env.NODE_ENV || 'development',
+  port: toInt(process.env.PORT, 3000),
+  baseDomain: (process.env.BASE_DOMAIN || 'thvuinin.my.id').toLowerCase(),
+  requiredMxHost: (process.env.REQUIRED_MX_HOST || 'mx.thvuinin.my.id').toLowerCase(),
+  redisUrl: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
+  emailStorageDir: path.resolve(rootDir, process.env.EMAIL_STORAGE_DIR || './emails'),
+  emailTtlSeconds: toInt(process.env.EMAIL_TTL_SECONDS, 86400),
+  inboxMaxMessages: toInt(process.env.INBOX_MAX_MESSAGES, 20),
+  inboxDailyLimit: toInt(process.env.INBOX_DAILY_LIMIT, 50),
+  domainMxCacheTtlSeconds: toInt(process.env.DOMAIN_MX_CACHE_TTL_SECONDS, 300),
+  apiRateLimitWindowMs: toInt(process.env.API_RATE_LIMIT_WINDOW_MS, 60000),
+  apiRateLimitMax: toInt(process.env.API_RATE_LIMIT_MAX, 120),
+  adminToken: process.env.ADMIN_TOKEN || '',
+  wsEnabled: process.env.WS_ENABLED !== 'false'
+};

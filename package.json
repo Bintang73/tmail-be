@@ -1,0 +1,28 @@
+{
+  "name": "tmail-be",
+  "version": "1.0.0",
+  "description": "Inbound-only temporary email backend with Haraka, Redis, and Express.",
+  "type": "module",
+  "packageManager": "bun@1.3.8",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "bun src/app.js",
+    "dev": "bun src/dev.js",
+    "worker:cleanup": "bun src/workers/cleanup.js",
+    "haraka:init": "haraka -i haraka",
+    "haraka:start": "bun src/harakaStart.js",
+    "lint:syntax": "node --check src/app.js && node --check src/dev.js && node --check src/harakaStart.js && node --check src/workers/cleanup.js && node --check haraka/plugins/validate_rcpt.js && node --check haraka/plugins/save_email.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "Haraka": "^3.1.5",
+    "ioredis": "^5.4.2",
+    "mailparser": "^3.7.2",
+    "morgan": "^1.10.0",
+    "uuid": "^11.0.5",
+    "ws": "^8.18.0"
+  }
+}
