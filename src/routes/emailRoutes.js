@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   deleteInbox,
   deleteMessageById,
+  domainStatus,
   generate,
   health,
   inbox,
@@ -10,6 +11,7 @@ import {
 } from '../controllers/emailController.js';
 import {
   adminAddDomain,
+  adminDomainStatus,
   adminDeleteDomain,
   adminDeleteDomainMessages,
   adminListDomains
@@ -24,9 +26,12 @@ emailRoutes.delete('/inbox', requireAdmin, deleteInbox);
 emailRoutes.get('/messages/:id', messageById);
 emailRoutes.delete('/messages/:id', requireAdmin, deleteMessageById);
 emailRoutes.get('/domains', publicDomains);
+emailRoutes.get('/domains/status', domainStatus);
+emailRoutes.get('/domains/:domain/status', domainStatus);
 emailRoutes.get('/health', health);
 
 emailRoutes.get('/admin/domains', requireAdmin, adminListDomains);
 emailRoutes.post('/admin/domains', requireAdmin, adminAddDomain);
+emailRoutes.get('/admin/domains/:domain/status', requireAdmin, adminDomainStatus);
 emailRoutes.delete('/admin/domains/:domain', requireAdmin, adminDeleteDomain);
 emailRoutes.delete('/admin/domains/:domain/messages', requireAdmin, adminDeleteDomainMessages);

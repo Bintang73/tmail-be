@@ -1,4 +1,4 @@
-import { addDomain, listDomains, removeDomain } from '../services/domainService.js';
+import { addDomain, getDomainStatus, listDomains, removeDomain } from '../services/domainService.js';
 import { deleteDomainMessages } from '../services/messageDeleteService.js';
 import { isValidDomain, normalizeDomain } from '../utils/email.js';
 
@@ -57,5 +57,19 @@ export const adminDeleteDomainMessages = async (req, res, next) => {
     return res.json(result);
   } catch (error) {
     return next(error);
+  }
+};
+
+export const adminDomainStatus = async (req, res, next) => {
+  try {
+    const domain = normalizeDomain(req.params.domain || req.query.domain);
+    if (!isValidDomain(domain)) {
+      return res.status(400).json({ error: 'Invalid domain' });
+    }
+
+    const status = await getDomainStatus(domain);
+    return res.json(status);
+  } catch (error) {
+    return handleError(error, res, next);
   }
 };

@@ -1,9 +1,9 @@
 import { readEmailFileById } from '../services/fileStorageService.js';
-import { getPublicDomainForGenerate, listDomains } from '../services/domainService.js';
+import { getDomainStatus, getPublicDomainForGenerate, listDomains } from '../services/domainService.js';
 import { getInboxMessages } from '../services/inboxService.js';
 import { deleteInboxEverywhere, deleteMessageEverywhere } from '../services/messageDeleteService.js';
 import { getRedis } from '../storage/redis.js';
-import { generateRandomEmail, isValidEmail, normalizeEmail } from '../utils/email.js';
+import { generateRandomEmail, isValidDomain, isValidEmail, normalizeDomain, normalizeEmail } from '../utils/email.js';
 
 export const generate = async (req, res, next) => {
   try {
@@ -78,6 +78,20 @@ export const publicDomains = async (req, res, next) => {
   try {
     const domains = await listDomains({ includePrivate: false });
     return res.json({ domains });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const domainStatus = async (req, res, next) => {
+  try {
+    const domain = normalizeDomain(req.query.domain || req.params.domain);
+    if (!isValidDomain(domain)) {
+      return res.status(400).json({ error: 'Invalid domain' });
+    }
+
+    const status = await getDomainStatus(domain);
+    return res.json(status);
   } catch (error) {
     return next(error);
   }

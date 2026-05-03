@@ -18,6 +18,48 @@ const hasRequiredMx = async (domain) => {
   });
 };
 
+export const checkDomainMx = async (domain) => {
+  const normalized = normalizeDomain(domain);
+  if (!isValidDomain(normalized)) {
+    const error = new Error('Invalid domain');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (isBaseDomain(normalized)) {
+    return {
+      valid: true,
+      records: [],
+      required_mx: config.requiredMxHost,
+      reason: 'base_domain'
+    };
+  }
+
+  let records = [];
+  try {
+    records = await dns.resolveMx(normalized);
+  } catch (error) {
+    return {
+      valid: false,
+      records: [],
+      required_mx: config.requiredMxHost,
+      reason: 'mx_lookup_failed'
+    };
+  }
+
+  const normalizedRecords = records.map((record) => ({
+    exchange: String(record.exchange || '').toLowerCase().replace(/\.$/, ''),
+    priority: record.priority
+  }));
+
+  return {
+    valid: normalizedRecords.some((record) => record.exchange === config.requiredMxHost),
+    records: normalizedRecords,
+    required_mx: config.requiredMxHost,
+    reason: 'dns_mx'
+  };
+};
+
 export const getRegisteredDomain = async (domain) => {
   const normalized = normalizeDomain(domain);
   if (!isValidDomain(normalized)) return null;
@@ -47,6 +89,40 @@ export const isRegisteredDomainActive = async (domain) => {
   }
 
   return false;
+};
+
+export const getDomainStatus = async (domain) => {
+  const normalized = normalizeDomain(domain);
+  if (!isValidDomain(normalized)) {
+    const error = new Error('Invalid domain');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const registered = await getRegisteredDomain(normalized);
+  const registeredActive = await isRegisteredDomainActive(normalized);
+  const mx = await checkDomainMx(normalized);
+  const active = isBaseDomain(normalized) || registeredActive || mx.valid;
+
+  return {
+    domain: normalized,
+    active,
+    registered: Boolean(registered),
+    visibility: registered?.visibility || (isBaseDomain(normalized) ? 'public' : null),
+    built_in: isBaseDomain(normalized),
+    mx_valid: mx.valid,
+    mx_records: mx.records,
+    required_mx: mx.required_mx,
+    active_reason: isBaseDomain(normalized)
+      ? 'base_domain'
+      : registeredActive
+        ? 'registered_domain'
+        : mx.valid
+          ? 'mx_points_to_required_host'
+          : 'inactive',
+    created_at: registered?.created_at || (isBaseDomain(normalized) ? 0 : null),
+    updated_at: registered?.updated_at || (isBaseDomain(normalized) ? 0 : null)
+  };
 };
 
 export const addDomain = async ({ domain, visibility = 'public', verifyMx = true }) => {

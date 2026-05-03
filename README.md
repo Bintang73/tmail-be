@@ -167,6 +167,42 @@ GET /api/v1/domains
 Menampilkan domain public aktif yang boleh dipakai untuk generate email.
 
 ```http
+GET /api/v1/domains/status?domain=example.com
+```
+
+atau:
+
+```http
+GET /api/v1/domains/example.com/status
+```
+
+Cek apakah domain aktif untuk inbound. Domain dianggap aktif jika salah satu kondisi ini benar:
+
+- domain adalah `BASE_DOMAIN` atau subdomainnya
+- domain terdaftar aktif di admin registry
+- MX domain mengarah ke `mx.thvuinin.my.id`
+
+Response:
+
+```json
+{
+  "domain": "example.com",
+  "active": true,
+  "registered": false,
+  "visibility": null,
+  "built_in": false,
+  "mx_valid": true,
+  "mx_records": [
+    { "exchange": "mx.thvuinin.my.id", "priority": 10 }
+  ],
+  "required_mx": "mx.thvuinin.my.id",
+  "active_reason": "mx_points_to_required_host",
+  "created_at": null,
+  "updated_at": null
+}
+```
+
+```http
 GET /api/v1/health
 ```
 
@@ -182,6 +218,13 @@ List semua domain aktif, termasuk private:
 
 ```http
 GET /api/v1/admin/domains
+X-Admin-Token: change-me-admin-token
+```
+
+Cek status domain dengan detail registry:
+
+```http
+GET /api/v1/admin/domains/example.com/status
 X-Admin-Token: change-me-admin-token
 ```
 
