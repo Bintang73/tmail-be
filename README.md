@@ -366,6 +366,12 @@ Response:
 {
   "domain": "example.com",
   "active": true,
+  "approved": true,
+  "approved_at": 1777885500393,
+  "uptime_seconds": 4492800,
+  "uptime_days": 52,
+  "uptime_label": "52 days",
+  "status_label": "Domain approved (uptime 52 days)",
   "registered": false,
   "visibility": null,
   "built_in": false,

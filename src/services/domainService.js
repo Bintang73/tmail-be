@@ -7,6 +7,54 @@ const activeDomainsKey = 'domains:active';
 const publicDomainsKey = 'domains:public';
 const privateDomainsKey = 'domains:private';
 const domainKey = (domain) => `domain:${normalizeDomain(domain)}`;
+const domainApprovedAtKey = (domain) => `domain_approved_at:${normalizeDomain(domain)}`;
+
+const formatDuration = (seconds) => {
+  const days = Math.floor(seconds / 86400);
+  if (days >= 1) return `${days} day${days === 1 ? '' : 's'}`;
+
+  const hours = Math.floor(seconds / 3600);
+  if (hours >= 1) return `${hours} hour${hours === 1 ? '' : 's'}`;
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes >= 1) return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+
+  return `${Math.max(0, seconds)} second${seconds === 1 ? '' : 's'}`;
+};
+
+const getApprovalStatus = async (domain, active) => {
+  const redis = getRedis();
+  const key = domainApprovedAtKey(domain);
+
+  if (!active) {
+    await redis.del(key);
+    return {
+      approved: false,
+      approved_at: null,
+      uptime_seconds: 0,
+      uptime_days: 0,
+      uptime_label: null,
+      status_label: 'Domain inactive'
+    };
+  }
+
+  const now = Date.now();
+  await redis.set(key, String(now), 'NX');
+
+  const approvedAt = Number(await redis.get(key)) || now;
+  const uptimeSeconds = Math.max(0, Math.floor((now - approvedAt) / 1000));
+  const uptimeDays = Math.floor(uptimeSeconds / 86400);
+  const uptimeLabel = formatDuration(uptimeSeconds);
+
+  return {
+    approved: true,
+    approved_at: approvedAt,
+    uptime_seconds: uptimeSeconds,
+    uptime_days: uptimeDays,
+    uptime_label: uptimeLabel,
+    status_label: `Domain approved (uptime ${uptimeLabel})`
+  };
+};
 
 const hasRequiredMx = async (domain) => {
   if (isBaseDomain(domain)) return true;
@@ -103,10 +151,12 @@ export const getDomainStatus = async (domain) => {
   const registeredActive = await isRegisteredDomainActive(normalized);
   const mx = await checkDomainMx(normalized);
   const active = isBaseDomain(normalized) || registeredActive || mx.valid;
+  const approval = await getApprovalStatus(normalized, active);
 
   return {
     domain: normalized,
     active,
+    ...approval,
     registered: Boolean(registered),
     visibility: registered?.visibility || (isBaseDomain(normalized) ? 'public' : null),
     built_in: isBaseDomain(normalized),
