@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import path from 'node:path';
 import dotenv from 'dotenv';
+import { getCloudflareTunnelArgs } from './utils/cloudflareTunnel.js';
 import { writeHarakaSmtpConfig } from './utils/harakaConfig.js';
 
 dotenv.config();
@@ -12,6 +13,7 @@ const redisPort = Number.parseInt(process.env.REDIS_PORT || '6379', 10);
 const redisPassword = process.env.REDIS_PASSWORD || 'd0535500cb173f97';
 const redisContainerName = process.env.REDIS_CONTAINER_NAME || 'tmail-redis-dev';
 const harakaBin = path.join(process.cwd(), 'node_modules/.bin/haraka');
+const cloudflareTunnelEnabled = process.env.CLOUDFLARE_TUNNEL_ENABLED === 'true';
 
 const run = (name, command, args, options = {}) => {
   const child = spawn(command, args, {
@@ -133,5 +135,14 @@ run('api', 'bun', ['--watch', 'src/app.js']);
 run('cleanup', 'bun', ['src/workers/cleanup.js']);
 run('email-queue', 'bun', ['src/workers/emailQueue.js']);
 run('haraka', harakaBin, ['-c', 'haraka']);
+
+if (cloudflareTunnelEnabled) {
+  if (!(await commandExists('cloudflared'))) {
+    console.error('[dev] CLOUDFLARE_TUNNEL_ENABLED=true but `cloudflared` is not installed or not in PATH.');
+    shutdown(1);
+  }
+
+  run('cloudflared', 'cloudflared', getCloudflareTunnelArgs());
+}
 
 console.info(`[dev] running redis, api, workers, and haraka smtp:${harakaSmtp.port}`);

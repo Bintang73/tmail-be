@@ -31,6 +31,76 @@ Set `ADMIN_TOKEN` di `.env`. Semua endpoint admin dan delete memakai header:
 X-Admin-Token: change-me-admin-token
 ```
 
+## Cloudflare Tunnel
+
+Cloudflare Tunnel bisa dipakai untuk Express API dan WebSocket saja:
+
+```txt
+https://api.example.com -> http://127.0.0.1:3000
+wss://api.example.com/ws -> ws://127.0.0.1:3000/ws
+```
+
+Redis tetap lokal, dan Haraka SMTP tetap harus menerima email lewat MX/port 25 langsung ke VPS. Jangan arahkan SMTP melalui Cloudflare Tunnel.
+
+Untuk development cepat tanpa named tunnel, install `cloudflared`, lalu set di `.env`:
+
+```env
+CLOUDFLARE_TUNNEL_ENABLED=true
+CLOUDFLARE_TUNNEL_MODE=quick
+CLOUDFLARE_TUNNEL_URL=http://127.0.0.1:3000
+```
+
+Setelah itu:
+
+```bash
+bun dev
+```
+
+`bun dev` akan menjalankan API, workers, Haraka, Redis dev, dan `cloudflared tunnel --url http://127.0.0.1:3000`.
+
+Untuk named tunnel production, pakai salah satu opsi berikut.
+
+Token tunnel:
+
+```env
+CLOUDFLARE_TUNNEL_ENABLED=true
+CLOUDFLARE_TUNNEL_TOKEN=token-dari-cloudflare
+```
+
+Config file tunnel:
+
+```env
+CLOUDFLARE_TUNNEL_ENABLED=true
+CLOUDFLARE_TUNNEL_CONFIG=./cloudflared/config.yml
+CLOUDFLARE_TUNNEL_NAME=tmail-api
+```
+
+Contoh config tersedia di `cloudflared/config.yml.example`. Copy dulu:
+
+```bash
+cp cloudflared/config.yml.example cloudflared/config.yml
+```
+
+Isi `cloudflared/config.yml`:
+
+```yaml
+tunnel: tmail-api
+credentials-file: ./cloudflared/tmail-api.json
+
+ingress:
+  - hostname: api.thvuinin.my.id
+    service: http://127.0.0.1:3000
+  - service: http_status:404
+```
+
+DNS Cloudflare:
+
+```txt
+api.thvuinin.my.id  -> tunnel route
+mx.thvuinin.my.id   -> A VPS_IP, DNS only
+thvuinin.my.id      -> MX 10 mx.thvuinin.my.id
+```
+
 Pastikan Redis aktif:
 
 ```bash

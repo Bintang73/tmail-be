@@ -5,6 +5,8 @@ node_modules/
 
 emails/
 haraka/queue/
+cloudflared/*.json
+cloudflared/config.yml
 
 *.log
 .DS_Store
