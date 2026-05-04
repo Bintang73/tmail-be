@@ -177,6 +177,65 @@ Lalu jalankan Haraka lewat service manager dengan permission yang sesuai.
 
 ## Podman
 
+### Podman Compose
+
+Cara paling mudah menjalankan semua service di VPS:
+
+```bash
+apt update
+apt install -y podman podman-compose
+```
+
+Pastikan `.env` untuk container memakai host Redis `redis`, bukan `127.0.0.1`:
+
+```env
+REDIS_PASSWORD=ganti-password-kuat
+REDIS_URL=redis://:ganti-password-kuat@redis:6379
+
+EMAIL_STORAGE_DIR=/app/emails
+EMAIL_SPOOL_DIR=/app/spool/emails
+
+HARAKA_SMTP_HOST=0.0.0.0
+HARAKA_SMTP_PORT=25
+```
+
+Build dan jalankan semua service:
+
+```bash
+podman-compose up -d --build
+```
+
+Service yang dijalankan:
+
+- `tmail-redis`
+- `tmail-api`
+- `tmail-email-worker`
+- `tmail-cleanup`
+- `tmail-haraka`
+
+Cek status dan log:
+
+```bash
+podman-compose ps
+podman-compose logs -f
+```
+
+Test API dari VPS:
+
+```bash
+curl http://127.0.0.1:3000/api/v1/health
+```
+
+Stop semua:
+
+```bash
+podman-compose down
+```
+
+API hanya dibind ke `127.0.0.1:3000`, jadi cocok dipakai bersama Cloudflare Tunnel di host. SMTP Haraka dibind ke host port `25`.
+
+### Manual Podman
+
 Build image aplikasi:
 
 ```bash

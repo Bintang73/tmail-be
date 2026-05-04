@@ -1,0 +1,82 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: tmail-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - tmail-redis:/data
+    networks:
+      - tmail-net
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: tmail-be:latest
+    container_name: tmail-api
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - tmail-emails:/app/emails
+    networks:
+      - tmail-net
+    command: bun src/app.js
+    restart: unless-stopped
+
+  email-worker:
+    image: tmail-be:latest
+    container_name: tmail-email-worker
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    volumes:
+      - tmail-emails:/app/emails
+      - tmail-spool:/app/spool
+    networks:
+      - tmail-net
+    command: bun src/workers/emailQueue.js
+    restart: unless-stopped
+
+  cleanup:
+    image: tmail-be:latest
+    container_name: tmail-cleanup
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    volumes:
+      - tmail-emails:/app/emails
+    networks:
+      - tmail-net
+    command: bun src/workers/cleanup.js
+    restart: unless-stopped
+
+  haraka:
+    image: tmail-be:latest
+    container_name: tmail-haraka
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    ports:
+      - "25:25"
+    volumes:
+      - tmail-spool:/app/spool
+    networks:
+      - tmail-net
+    command: bun src/harakaStart.js
+    restart: unless-stopped
+
+volumes:
+  tmail-redis:
+  tmail-emails:
+  tmail-spool:
+
+networks:
+  tmail-net:
