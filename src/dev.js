@@ -131,6 +131,7 @@ const harakaSmtp = await writeHarakaSmtpConfig();
 
 run('api', 'bun', ['--watch', 'src/app.js']);
 run('cleanup', 'bun', ['src/workers/cleanup.js']);
+run('email-queue', 'bun', ['src/workers/emailQueue.js']);
 run('haraka', harakaBin, ['-c', 'haraka']);
 
-console.info(`[dev] running redis, api, cleanup worker, and haraka smtp:${harakaSmtp.port}`);
+console.info(`[dev] running redis, api, workers, and haraka smtp:${harakaSmtp.port}`);

@@ -1,16 +1,19 @@
 # Temporary Email Backend
 
-Backend inbound-only untuk temporary email. Sistem menerima SMTP via Haraka, memvalidasi catch-all domain, menyimpan metadata inbox di Redis dengan TTL 1 hari, dan menyimpan detail body email ke file system.
+Backend inbound-only untuk temporary email. Sistem menerima SMTP via Haraka, memvalidasi catch-all domain, menaruh raw email ke spool lokal, memproses email lewat Redis Stream worker, menyimpan metadata inbox di Redis dengan TTL 1 hari, dan menyimpan detail body email ke file system.
 
 ## Fitur
 
 - SMTP inbound-only dengan Haraka.
 - Catch-all untuk `thvuinin.my.id` dan semua subdomainnya.
 - Custom domain tanpa registrasi, valid otomatis jika MX mengarah ke `mx.thvuinin.my.id`.
+- Redis Stream queue untuk memisahkan SMTP accept path dari parsing/storage email.
 - Redis hot storage per inbox dengan TTL 86400 detik.
-- File cold storage di `emails/YYYY-MM-DD/{uuid}.json`.
+- Spool raw email lokal di `spool/emails/YYYY-MM-DD/HH/*.eml`.
+- File cold storage sharded di `emails/YYYY-MM-DD/aa/bb/{uuid}.json`.
 - Express API `/api/v1`.
 - Rate limit API, validasi email input, limit 50 email per inbox per hari.
+- Worker email queue untuk parse raw email async.
 - Worker cleanup file email lebih dari 1 hari.
 - WebSocket update inbox saat email masuk.
 - Admin API untuk tambah/hapus domain aktif dan hapus pesan.
@@ -74,6 +77,12 @@ Jalankan worker cleanup saja:
 bun run worker:cleanup
 ```
 
+Jalankan worker email queue saja:
+
+```bash
+bun run worker:email
+```
+
 Jalankan Haraka saja:
 
 ```bash
@@ -95,6 +104,167 @@ HARAKA_SMTP_PORT=25
 ```
 
 Lalu jalankan Haraka lewat service manager dengan permission yang sesuai.
+
+## Podman
+
+Build image aplikasi:
+
+```bash
+podman build -t tmail-be:latest -f Containerfile .
+```
+
+Buat network dan volume lokal:
+
+```bash
+podman network create tmail-net
+podman volume create tmail-redis
+podman volume create tmail-emails
+podman volume create tmail-spool
+```
+
+Buat env khusus container, misalnya `.env.podman`:
+
+```env
+NODE_ENV=production
+PORT=3000
+
+BASE_DOMAIN=thvuinin.my.id
+REQUIRED_MX_HOST=mx.thvuinin.my.id
+
+REDIS_PASSWORD=ganti-password-kuat
+REDIS_URL=redis://:ganti-password-kuat@redis:6379
+
+HARAKA_SMTP_HOST=0.0.0.0
+HARAKA_SMTP_PORT=2525
+HARAKA_SMTP_NODES=0
+
+EMAIL_STORAGE_DIR=/app/emails
+EMAIL_SPOOL_DIR=/app/spool/emails
+EMAIL_TTL_SECONDS=86400
+INBOX_MAX_MESSAGES=20
+INBOX_DAILY_LIMIT=50
+EMAIL_QUEUE_STREAM=email_queue
+EMAIL_QUEUE_GROUP=email_processors
+EMAIL_QUEUE_BATCH_SIZE=10
+EMAIL_QUEUE_MAXLEN=100000
+DOMAIN_MX_CACHE_TTL_SECONDS=3600
+
+API_RATE_LIMIT_WINDOW_MS=60000
+API_RATE_LIMIT_MAX=120
+ADMIN_TOKEN=ganti-token-admin-kuat
+WS_ENABLED=true
+```
+
+Jalankan Redis:
+
+```bash
+podman run -d \
+  --name tmail-redis \
+  --network tmail-net \
+  -v tmail-redis:/data \
+  redis:7-alpine \
+  redis-server --appendonly yes --requirepass ganti-password-kuat
+```
+
+Jalankan API:
+
+```bash
+podman run -d \
+  --name tmail-api \
+  --network tmail-net \
+  --env-file .env.podman \
+  -p 3000:3000 \
+  -v tmail-emails:/app/emails \
+  tmail-be:latest \
+  bun src/app.js
+```
+
+Jalankan worker email queue:
+
+```bash
+podman run -d \
+  --name tmail-email-worker \
+  --network tmail-net \
+  --env-file .env.podman \
+  -v tmail-emails:/app/emails \
+  -v tmail-spool:/app/spool \
+  tmail-be:latest \
+  bun src/workers/emailQueue.js
+```
+
+Jalankan worker cleanup:
+
+```bash
+podman run -d \
+  --name tmail-cleanup \
+  --network tmail-net \
+  --env-file .env.podman \
+  -v tmail-emails:/app/emails \
+  tmail-be:latest \
+  bun src/workers/cleanup.js
+```
+
+Jalankan Haraka SMTP. Untuk test lokal gunakan port `2525`:
+
+```bash
+podman run -d \
+  --name tmail-haraka \
+  --network tmail-net \
+  --env-file .env.podman \
+  -p 2525:2525 \
+  -v tmail-spool:/app/spool \
+  tmail-be:latest \
+  bun src/harakaStart.js
+```
+
+Cek log:
+
+```bash
+podman logs -f tmail-haraka
+podman logs -f tmail-email-worker
+```
+
+Test API:
+
+```bash
+curl http://127.0.0.1:3000/api/v1/health
+curl http://127.0.0.1:3000/api/v1/generate
+```
+
+Untuk production SMTP port `25`, ada dua opsi.
+
+Opsi pertama, jalankan container Haraka dengan port `25`:
+
+```bash
+podman rm -f tmail-haraka
+sed -i 's/HARAKA_SMTP_PORT=2525/HARAKA_SMTP_PORT=25/' .env.podman
+
+sudo podman run -d \
+  --name tmail-haraka \
+  --network tmail-net \
+  --env-file .env.podman \
+  -p 25:25 \
+  -v tmail-spool:/app/spool \
+  tmail-be:latest \
+  bun src/harakaStart.js
+```
+
+Opsi kedua, Haraka tetap listen `2525`, lalu redirect port host `25` ke `2525` memakai firewall. Ini membuat proses aplikasi tidak perlu bind langsung ke privileged port. Aturan firewall berbeda per distro, jadi sesuaikan dengan `nftables`, `iptables`, atau firewall panel VPS.
+
+Stop semua service:
+
+```bash
+podman rm -f tmail-haraka tmail-cleanup tmail-email-worker tmail-api tmail-redis
+```
+
+Catatan Podman:
+
+- Semua container harus berada di network `tmail-net`.
+- `tmail-spool` harus dipakai bersama oleh Haraka dan email worker.
+- `tmail-emails` harus dipakai bersama oleh API, email worker, dan cleanup worker.
+- Jangan expose Redis ke internet.
+- Untuk jutaan email/hari di satu VPS, batasi ukuran email di `haraka/config/connection.ini`, misalnya `[max] bytes=1048576`.
+- Rootless Podman biasanya tidak bisa bind port `25` langsung; gunakan rootful Podman atau redirect firewall.
 
 ## Haraka Config
 
@@ -316,4 +486,6 @@ Saat email masuk, server mengirim event:
 
 ## Catatan Skala
 
-Redis menyimpan list inbox pendek dan TTL sehingga lookup cepat. Body email tidak diload massal ke RAM karena detail disimpan per file berdasarkan tanggal. Untuk jutaan email, jalankan beberapa instance Haraka/API, gunakan Redis terkelola/cluster, shared filesystem/object storage kompatibel, dan log rotation.
+Redis menyimpan list inbox pendek, Redis Stream hanya menyimpan pointer spool, dan raw email ditulis ke disk supaya RAM Redis tidak habis oleh body email. Body final disimpan sharded per UUID agar satu folder tidak berisi jutaan file.
+
+Untuk VPS tunggal, wajib batasi ukuran email, TTL, queue length, dan pantau disk. Contoh batas aman untuk temporary email text/OTP adalah 512 KB sampai 1 MB per email. Jika traffic benar-benar jutaan email/hari, kapasitas utama yang harus dipantau adalah disk I/O, free disk, Redis memory, dan lag worker email queue.

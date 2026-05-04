@@ -1,37 +1,91 @@
+const fs = require('node:fs');
 const path = require('node:path');
+const Redis = require('ioredis');
 
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+
+const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+const redisPassword = process.env.REDIS_PASSWORD || 'd0535500cb173f97';
+const queueStream = process.env.EMAIL_QUEUE_STREAM || 'email_queue';
+const queueMaxLength = Number.parseInt(process.env.EMAIL_QUEUE_MAXLEN || '100000', 10);
 const rootDir = path.resolve(__dirname, '../..');
-let services;
+const spoolDir = path.resolve(rootDir, process.env.EMAIL_SPOOL_DIR || './spool/emails');
 
-const loadServices = async () => {
-  if (!services) {
-    services = await import(path.join(rootDir, 'src/services/emailProcessingService.js'));
+let redis;
+
+const getRedis = () => {
+  if (!redis) {
+    redis = new Redis(redisUrl, {
+      maxRetriesPerRequest: 1,
+      enableReadyCheck: true,
+      lazyConnect: true,
+      password: redisPassword || undefined,
+      retryStrategy(times) {
+        if (times > 10) return null;
+        return Math.min(times * 250, 2000);
+      },
+      reconnectOnError() {
+        return false;
+      }
+    });
   }
 
-  return services;
+  return redis;
 };
 
 exports.register = function register() {
-  this.register_hook('data_post', 'hook_data');
+  this.register_hook('queue', 'queue_email');
 };
 
-exports.hook_data = async function hookData(next, connection) {
+exports.queue_email = function queueEmail(next, connection) {
   try {
-    const { processRawEmail } = await loadServices();
     const transaction = connection.transaction;
-    const chunks = [];
+    const date = new Date();
+    const folder = path.join(
+      spoolDir,
+      date.toISOString().slice(0, 10),
+      String(date.getUTCHours()).padStart(2, '0')
+    );
+    fs.mkdirSync(folder, { recursive: true });
 
-    for await (const chunk of transaction.message_stream) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
+    const safeUuid = String(transaction.uuid || `${Date.now()}-${Math.random()}`).replace(/[^a-zA-Z0-9.-]/g, '_');
+    const spoolPath = path.join(folder, `${safeUuid}.eml`);
+    const writable = fs.createWriteStream(spoolPath);
 
-    const raw = Buffer.concat(chunks);
-    const recipients = transaction.notes.valid_recipients || transaction.rcpt_to.map((rcpt) => rcpt.address().toLowerCase());
+    writable.on('error', (error) => {
+      connection.logerror(this, `queue email stream failed: ${error.stack || error.message}`);
+      return next(DENYSOFT, 'Temporary queue error');
+    });
 
-    await processRawEmail({ raw, recipients });
-    return next(OK);
+    writable.on('finish', async () => {
+      try {
+        const recipients = transaction.notes.valid_recipients || transaction.rcpt_to.map((rcpt) => rcpt.address().toLowerCase());
+
+        const queueId = await getRedis().xadd(
+          queueStream,
+          'MAXLEN',
+          '~',
+          queueMaxLength,
+          '*',
+          'spool_path',
+          spoolPath,
+          'recipients',
+          JSON.stringify(recipients),
+          'received_at',
+          String(Date.now())
+        );
+
+        connection.loginfo(this, `queued email id=${queueId} recipients=${recipients.length}`);
+        return next(OK, 'Message Queued');
+      } catch (error) {
+        connection.logerror(this, `queue email failed: ${error.stack || error.message}`);
+        return next(DENYSOFT, 'Temporary queue error');
+      }
+    });
+
+    transaction.message_stream.pipe(writable);
   } catch (error) {
-    connection.logerror(this, `save email failed: ${error.stack || error.message}`);
-    return next(DENYSOFT, 'Temporary storage error');
+    connection.logerror(this, `queue email failed: ${error.stack || error.message}`);
+    return next(DENYSOFT, 'Temporary queue error');
   }
 };
