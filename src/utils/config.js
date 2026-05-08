@@ -8,11 +8,23 @@ const toInt = (value, fallback) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const toTrustProxy = (value, fallback = 1) => {
+  if (value === undefined || value === null || value === '') return fallback;
+
+  const normalized = String(value).trim().toLowerCase();
+  if (['false', '0', 'off', 'no'].includes(normalized)) return false;
+  if (['true', 'on', 'yes'].includes(normalized)) return true;
+
+  const parsed = Number.parseInt(normalized, 10);
+  return Number.isFinite(parsed) ? parsed : value;
+};
+
 const rootDir = process.cwd();
 
 export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: toInt(process.env.PORT, 3000),
+  trustProxy: toTrustProxy(process.env.TRUST_PROXY, 1),
   baseDomain: (process.env.BASE_DOMAIN || 'thvuinin.my.id').toLowerCase(),
   requiredMxHost: (process.env.REQUIRED_MX_HOST || 'mx.thvuinin.my.id').toLowerCase(),
   redisHost: process.env.REDIS_HOST || '127.0.0.1',

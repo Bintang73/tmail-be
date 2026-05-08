@@ -10,6 +10,7 @@ import { config } from './utils/config.js';
 const app = express();
 
 app.disable('x-powered-by');
+app.set('trust proxy', config.trustProxy);
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 app.use(morgan('combined'));

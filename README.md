@@ -42,6 +42,7 @@ wss://api.example.com/ws -> ws://127.0.0.1:3000/ws
 ```
 
 Redis tetap lokal, dan Haraka SMTP tetap harus menerima email lewat MX/port 25 langsung ke VPS. Jangan arahkan SMTP melalui Cloudflare Tunnel.
+API memakai `TRUST_PROXY=1` supaya Express membaca IP client dari proxy/tunnel dan `express-rate-limit` tidak error saat menerima header `X-Forwarded-For`. Jika API benar-benar diekspos langsung tanpa reverse proxy, set `TRUST_PROXY=0`.
 
 Untuk development cepat tanpa named tunnel, install `cloudflared`, lalu set di `.env`:
 
@@ -49,6 +50,7 @@ Untuk development cepat tanpa named tunnel, install `cloudflared`, lalu set di `
 CLOUDFLARE_TUNNEL_ENABLED=true
 CLOUDFLARE_TUNNEL_MODE=quick
 CLOUDFLARE_TUNNEL_URL=http://127.0.0.1:3000
+TRUST_PROXY=1
 ```
 
 Setelah itu:
@@ -303,6 +305,7 @@ Buat env khusus container, misalnya `.env.podman`:
 ```env
 NODE_ENV=production
 PORT=3000
+TRUST_PROXY=1
 
 BASE_DOMAIN=thvuinin.my.id
 REQUIRED_MX_HOST=mx.thvuinin.my.id
