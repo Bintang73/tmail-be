@@ -32,5 +32,8 @@ export const config = {
   openaiApiKey: process.env.OPENAI_API_KEY || '',
   openaiModel: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
   otpAiEnabled: process.env.OTP_AI_ENABLED === 'true',
+  otpTemplateCacheTtlSeconds: toInt(process.env.OTP_TEMPLATE_CACHE_TTL_SECONDS, 30 * 24 * 60 * 60),
+  otpAiMaxBodyChars: toInt(process.env.OTP_AI_MAX_BODY_CHARS, 3000),
+  otpAiDailyLimit: toInt(process.env.OTP_AI_DAILY_LIMIT, 500),
   wsEnabled: process.env.WS_ENABLED !== 'false'
 };
