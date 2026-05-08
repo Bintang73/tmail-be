@@ -4,6 +4,7 @@ import { addInboxMessage, canAcceptInboxMessage } from './inboxService.js';
 import { saveEmailFile } from './fileStorageService.js';
 import { normalizeEmail } from '../utils/email.js';
 import { publishInboxUpdate } from './realtimeService.js';
+import { detectOtp } from './otpDetectionService.js';
 
 const addressList = (value) => {
   if (!value?.value) return [];
@@ -26,6 +27,10 @@ export const processRawEmail = async ({ raw, recipients }) => {
     raw: raw.toString('utf8'),
     created_at: createdAt
   };
+
+  const otpResult = await detectOtp(message);
+  message.is_otp = otpResult.is_otp;
+  message.otp = otpResult.otp;
 
   await saveEmailFile(message);
 

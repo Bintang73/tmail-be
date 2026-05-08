@@ -12,7 +12,7 @@
     "worker:email": "bun src/workers/emailQueue.js",
     "haraka:init": "haraka -i haraka",
     "haraka:start": "bun src/harakaStart.js",
-    "lint:syntax": "node --check src/app.js && node --check src/dev.js && node --check src/harakaStart.js && node --check src/services/emailQueueService.js && node --check src/utils/cloudflareTunnel.js && node --check src/workers/cleanup.js && node --check src/workers/emailQueue.js && node --check haraka/plugins/validate_rcpt.js && node --check haraka/plugins/save_email.js"
+    "lint:syntax": "node --check src/app.js && node --check src/dev.js && node --check src/harakaStart.js && node --check src/services/emailQueueService.js && node --check src/services/otpDetectionService.js && node --check src/utils/cloudflareTunnel.js && node --check src/workers/cleanup.js && node --check src/workers/emailQueue.js && node --check haraka/plugins/validate_rcpt.js && node --check haraka/plugins/save_email.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

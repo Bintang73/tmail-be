@@ -29,5 +29,8 @@ export const config = {
   apiRateLimitWindowMs: toInt(process.env.API_RATE_LIMIT_WINDOW_MS, 60000),
   apiRateLimitMax: toInt(process.env.API_RATE_LIMIT_MAX, 120),
   adminToken: process.env.ADMIN_TOKEN || '',
+  openaiApiKey: process.env.OPENAI_API_KEY || '',
+  openaiModel: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+  otpAiEnabled: process.env.OTP_AI_ENABLED === 'true',
   wsEnabled: process.env.WS_ENABLED !== 'false'
 };

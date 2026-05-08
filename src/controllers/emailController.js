@@ -40,7 +40,11 @@ export const messageById = async (req, res, next) => {
       return res.status(404).json({ error: 'Message not found' });
     }
 
-    return res.json(message);
+    return res.json({
+      ...message,
+      is_otp: Boolean(message.is_otp),
+      otp: message.is_otp ? message.otp || null : null
+    });
   } catch (error) {
     return next(error);
   }
