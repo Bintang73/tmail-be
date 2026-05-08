@@ -17,6 +17,7 @@ Backend inbound-only untuk temporary email. Sistem menerima SMTP via Haraka, mem
 - Worker cleanup file email lebih dari 1 hari.
 - WebSocket update inbox saat email masuk.
 - Admin API untuk tambah/hapus domain aktif dan hapus pesan.
+- Deteksi OTP otomatis dengan regex lokal, fallback OpenAI opsional, dan Redis template learning agar tidak hit AI terus-menerus untuk pola email yang sama.
 
 ## Setup
 
@@ -113,6 +114,52 @@ Konfigurasi Redis default:
 REDIS_PASSWORD=d0535500cb173f97
 REDIS_URL=redis://:d0535500cb173f97@127.0.0.1:6379
 ```
+
+## OTP Detection
+
+Setiap detail message dari `GET /api/v1/messages/:id` otomatis ditambah:
+
+```json
+{
+  "is_otp": true,
+  "otp": "123456"
+}
+```
+
+Jika email bukan OTP, response tetap memakai field yang sama:
+
+```json
+{
+  "is_otp": false,
+  "otp": null
+}
+```
+
+Alur deteksi OTP:
+
+- Regex lokal dijalankan lebih dulu.
+- Redis exact template cache dipakai untuk pola email yang sama persis.
+- Redis fallback template cache dipakai untuk sender dan subject pattern yang sama walaupun body berubah.
+- Learned extraction rule menyimpan konteks sebelum/sesudah kode agar OTP baru bisa diambil tanpa OpenAI.
+- OpenAI hanya dipanggil kalau email ambigu, cache belum ada, dan `OTP_AI_ENABLED=true`.
+- Hasil OpenAI disimpan ke Redis sebagai template OTP/non-OTP untuk menghemat token pada email berikutnya.
+
+Konfigurasi:
+
+```env
+OPENAI_API_KEY=sk-proj-your-openai-api-key
+OPENAI_MODEL=gpt-4.1-mini
+OTP_AI_ENABLED=true
+OTP_TEMPLATE_CACHE_TTL_SECONDS=2592000
+OTP_AI_MAX_BODY_CHARS=3000
+OTP_AI_DAILY_LIMIT=500
+```
+
+Catatan:
+
+- Simpan API key asli hanya di `.env` atau deployment secrets, jangan commit key asli ke repo.
+- Set `OTP_AI_ENABLED=false` untuk mode full lokal tanpa OpenAI.
+- `OTP_AI_DAILY_LIMIT=0` berarti tidak ada batas harian.
 
 Jalankan semua service development:
 
@@ -281,6 +328,14 @@ DOMAIN_MX_CACHE_TTL_SECONDS=3600
 API_RATE_LIMIT_WINDOW_MS=60000
 API_RATE_LIMIT_MAX=120
 ADMIN_TOKEN=ganti-token-admin-kuat
+
+OPENAI_API_KEY=sk-proj-your-openai-api-key
+OPENAI_MODEL=gpt-4.1-mini
+OTP_AI_ENABLED=true
+OTP_TEMPLATE_CACHE_TTL_SECONDS=2592000
+OTP_AI_MAX_BODY_CHARS=3000
+OTP_AI_DAILY_LIMIT=500
+
 WS_ENABLED=true
 ```
 
@@ -451,7 +506,22 @@ Response:
 GET /api/v1/messages/:id
 ```
 
-Response: detail email dari file storage.
+Response: detail email dari file storage. Field lama tetap ada, ditambah `is_otp` dan `otp`.
+
+```json
+{
+  "id": "d2fb0b7c-7a8d-4fb0-bc37-4e0f95f67d3b",
+  "from": "Service <no-reply@example.com>",
+  "to": ["abc123@thvuinin.my.id"],
+  "subject": "Your verification code",
+  "text": "Use code 123456 to login.",
+  "html": "",
+  "raw": "...",
+  "created_at": 1710000000000,
+  "is_otp": true,
+  "otp": "123456"
+}
+```
 
 ```http
 DELETE /api/v1/messages/:id
