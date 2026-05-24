@@ -79,6 +79,38 @@ export const openApiSpec = {
     }
   },
   paths: {
+    '/swagger': {
+      get: {
+        summary: 'Open Swagger UI',
+        description: 'Browser-based API documentation page served by this API.',
+        responses: {
+          200: {
+            description: 'Swagger UI HTML',
+            content: {
+              'text/html': {
+                schema: { type: 'string' }
+              }
+            }
+          }
+        }
+      }
+    },
+    '/swagger.json': {
+      get: {
+        summary: 'OpenAPI JSON document',
+        description: 'Raw OpenAPI 3.0 document used by Swagger UI.',
+        responses: {
+          200: {
+            description: 'OpenAPI JSON',
+            content: {
+              'application/json': {
+                schema: { type: 'object' }
+              }
+            }
+          }
+        }
+      }
+    },
     '/generate': {
       get: {
         summary: 'Generate a temporary email address',

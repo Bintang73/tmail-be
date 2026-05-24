@@ -479,32 +479,56 @@ example.com.  MX 10 mx.thvuinin.my.id.
 
 Base URL: `/api/v1`
 
-Dokumentasi Swagger/OpenAPI tersedia di:
+Semua endpoint di bawah juga tersedia di Swagger UI:
 
 ```http
 GET /api/v1/swagger
 ```
 
-Endpoint ini menampilkan Swagger UI dan bisa dibuka dari browser saat API berjalan, misalnya:
-
-```txt
-http://127.0.0.1:3000/api/v1/swagger
-```
-
-Jika API dipublish lewat domain atau Cloudflare Tunnel, buka URL yang sama di host online:
-
-```txt
-https://api.example.com/api/v1/swagger
-```
-
-OpenAPI JSON mentah tersedia di:
+OpenAPI JSON mentah:
 
 ```http
 GET /api/v1/swagger.json
 ```
 
+Contoh URL lokal:
+
+```txt
+http://127.0.0.1:3000/api/v1/swagger
+```
+
+Contoh URL online:
+
+```txt
+https://api.example.com/api/v1/swagger
+```
+
+Endpoint admin memakai header:
+
+```http
+X-Admin-Token: change-me-admin-token
+```
+
+Jika `ADMIN_TOKEN` belum diset, endpoint admin mengembalikan `503`.
+
+### Public API
+
+#### Generate Temporary Email
+
 ```http
 GET /api/v1/generate
+```
+
+Membuat alamat email random memakai domain public default.
+
+Query parameter:
+
+- `domain` optional, string. Jika diisi, domain harus domain registered public.
+
+Contoh:
+
+```http
+GET /api/v1/generate?domain=example.com
 ```
 
 Response:
@@ -513,27 +537,88 @@ Response:
 { "email": "abc123@thvuinin.my.id", "domain": "thvuinin.my.id" }
 ```
 
-Generate memakai domain public tertentu:
+Kemungkinan error:
 
-```http
-GET /api/v1/generate?domain=example.com
-```
+- `404` jika `domain` diminta tetapi tidak tersedia untuk public generation.
+
+#### Read Inbox
 
 ```http
 GET /api/v1/inbox?email=abc123@thvuinin.my.id
 ```
 
+Membaca list message pendek dari Redis untuk satu inbox.
+
+Query parameter:
+
+- `email` required, format email valid.
+
 Response:
 
 ```json
-{ "email": "abc123@thvuinin.my.id", "messages": [] }
+{
+  "email": "abc123@thvuinin.my.id",
+  "messages": [
+    {
+      "id": "d2fb0b7c-7a8d-4fb0-bc37-4e0f95f67d3b",
+      "from": "Service <no-reply@example.com>",
+      "subject": "Your verification code",
+      "timestamp": 1710000000000
+    }
+  ]
+}
 ```
+
+Kemungkinan error:
+
+- `400` jika email tidak valid.
+
+#### Delete Inbox
+
+```http
+DELETE /api/v1/inbox?email=abc123@thvuinin.my.id
+X-Admin-Token: change-me-admin-token
+```
+
+Menghapus semua message yang ada di inbox email tersebut dari Redis inbox dan file storage.
+
+Auth: admin token required.
+
+Query parameter:
+
+- `email` required, format email valid.
+
+Response:
+
+```json
+{
+  "email": "abc123@thvuinin.my.id",
+  "messages_deleted": 2,
+  "message_ids": [
+    "d2fb0b7c-7a8d-4fb0-bc37-4e0f95f67d3b"
+  ]
+}
+```
+
+Kemungkinan error:
+
+- `400` jika email tidak valid.
+- `401` jika admin token salah.
+- `503` jika admin token belum dikonfigurasi.
+
+#### Read Message Detail
 
 ```http
 GET /api/v1/messages/:id
 ```
 
-Response: detail email dari file storage. Field lama tetap ada, ditambah `is_otp` dan `otp`.
+Membaca detail email dari file storage.
+
+Path parameter:
+
+- `id` required, UUID message.
+
+Response:
 
 ```json
 {
@@ -550,6 +635,22 @@ Response: detail email dari file storage. Field lama tetap ada, ditambah `is_otp
 }
 ```
 
+Jika email bukan OTP, field tetap ada:
+
+```json
+{
+  "is_otp": false,
+  "otp": null
+}
+```
+
+Kemungkinan error:
+
+- `400` jika message id tidak valid.
+- `404` jika message tidak ditemukan.
+
+#### Delete Message
+
 ```http
 DELETE /api/v1/messages/:id
 X-Admin-Token: change-me-admin-token
@@ -557,12 +658,32 @@ X-Admin-Token: change-me-admin-token
 
 Hapus satu pesan dari Redis inbox dan file storage.
 
-```http
-DELETE /api/v1/inbox?email=abc123@thvuinin.my.id
-X-Admin-Token: change-me-admin-token
+Auth: admin token required.
+
+Path parameter:
+
+- `id` required, UUID message.
+
+Response:
+
+```json
+{
+  "message_id": "d2fb0b7c-7a8d-4fb0-bc37-4e0f95f67d3b",
+  "deleted": true,
+  "inbox_entries_deleted": 1,
+  "file_deleted": true,
+  "recipients": ["abc123@thvuinin.my.id"]
+}
 ```
 
-Hapus semua pesan yang ada di inbox email tersebut.
+Kemungkinan error:
+
+- `400` jika message id tidak valid.
+- `401` jika admin token salah.
+- `404` jika message tidak ditemukan.
+- `503` jika admin token belum dikonfigurasi.
+
+#### List Incoming Domains
 
 ```http
 GET /api/v1/list-domain?page=1&limit=20
@@ -595,17 +716,43 @@ Response:
 }
 ```
 
+Catatan storage:
+
+- domain disimpan di Redis sorted set `domains:incoming:mx_valid`
+- counter disimpan di `domain_incoming_count:{domain}`
+- list ini tidak memakai TTL
+
+#### List Public Domains
+
 ```http
 GET /api/v1/domains
 ```
 
 Menampilkan domain public aktif yang boleh dipakai untuk generate email.
 
+Response:
+
+```json
+{
+  "domains": [
+    {
+      "domain": "thvuinin.my.id",
+      "visibility": "public",
+      "created_at": 0,
+      "updated_at": 0,
+      "built_in": true
+    }
+  ]
+}
+```
+
+#### Check Domain Status
+
 ```http
 GET /api/v1/domains/status?domain=example.com
 ```
 
-atau:
+Alternatif path parameter:
 
 ```http
 GET /api/v1/domains/example.com/status
@@ -643,15 +790,32 @@ Response:
 }
 ```
 
+Kemungkinan error:
+
+- `400` jika domain tidak valid.
+
+#### Health Check
+
 ```http
 GET /api/v1/health
 ```
+
+Health check public yang ringan untuk API dan Redis.
 
 Response:
 
 ```json
 { "api": "ok", "redis": "ok", "smtp": "ok" }
 ```
+
+Kemungkinan status:
+
+- `200` jika Redis bisa di-ping.
+- `503` jika Redis error.
+
+### Admin Monitoring API
+
+#### Detailed System Status
 
 ```http
 GET /api/v1/system/status
@@ -726,21 +890,57 @@ Contoh response ringkas:
 }
 ```
 
-## Admin Domain API
+Kemungkinan status:
 
-List semua domain aktif, termasuk private:
+- `200` jika dependency utama online.
+- `503` jika Redis atau Haraka degraded.
+- `401` jika admin token salah.
+- `503` jika admin token belum dikonfigurasi.
+
+### Admin Domain API
+
+#### List All Active Domains
+
+List semua domain aktif, termasuk private.
 
 ```http
 GET /api/v1/admin/domains
 X-Admin-Token: change-me-admin-token
 ```
 
-Cek status domain dengan detail registry:
+Auth: admin token required.
+
+Response:
+
+```json
+{
+  "domains": [
+    {
+      "domain": "example.com",
+      "visibility": "public",
+      "created_at": 1710000000000,
+      "updated_at": 1710000000000
+    }
+  ]
+}
+```
+
+#### Admin Check Domain Status
 
 ```http
 GET /api/v1/admin/domains/example.com/status
 X-Admin-Token: change-me-admin-token
 ```
+
+Auth: admin token required.
+
+Path parameter:
+
+- `domain` required.
+
+Response sama seperti public domain status, tetapi endpoint ini ada di area admin.
+
+#### Add Domain
 
 Tambah domain public:
 
@@ -754,6 +954,14 @@ Content-Type: application/json
   "visibility": "public"
 }
 ```
+
+Auth: admin token required.
+
+Body:
+
+- `domain` required, string domain valid.
+- `visibility` optional, `public` atau `private`, default `public`.
+- `verify_mx` optional, boolean, default `true`.
 
 Tambah domain private:
 
@@ -781,18 +989,82 @@ Secara default API tambah domain memverifikasi MX harus mengarah ke `mx.thvuinin
 }
 ```
 
-Hapus domain dari daftar aktif:
+Response:
+
+```json
+{
+  "domain": {
+    "domain": "example.com",
+    "visibility": "public",
+    "created_at": 1710000000000,
+    "updated_at": 1710000000000
+  }
+}
+```
+
+Kemungkinan error:
+
+- `400` jika domain invalid atau visibility bukan `public`/`private`.
+- `401` jika admin token salah.
+- `422` jika `verify_mx=true` dan MX tidak mengarah ke `REQUIRED_MX_HOST`.
+
+#### Delete Domain
+
+Hapus domain dari daftar aktif.
 
 ```http
 DELETE /api/v1/admin/domains/example.com
 X-Admin-Token: change-me-admin-token
 ```
 
-Hapus semua pesan untuk domain tertentu:
+Auth: admin token required.
+
+Path parameter:
+
+- `domain` required.
+
+Response:
+
+```json
+{
+  "domain": "example.com",
+  "deleted": true
+}
+```
+
+Kemungkinan error:
+
+- `400` jika domain invalid.
+- `401` jika admin token salah.
+- `404` jika domain tidak ditemukan.
+- `409` jika mencoba menghapus built-in base domain.
+
+#### Delete Domain Messages
+
+Hapus semua pesan untuk domain tertentu.
 
 ```http
 DELETE /api/v1/admin/domains/example.com/messages
 X-Admin-Token: change-me-admin-token
+```
+
+Auth: admin token required.
+
+Path parameter:
+
+- `domain` required.
+
+Response:
+
+```json
+{
+  "domain": "example.com",
+  "inboxes_deleted": 3,
+  "messages_deleted": 12,
+  "message_ids": [
+    "d2fb0b7c-7a8d-4fb0-bc37-4e0f95f67d3b"
+  ]
+}
 ```
 
 Catatan: domain yang tidak diregistrasikan tetap bisa diterima otomatis jika MX domain tersebut mengarah ke `mx.thvuinin.my.id`. Registry domain admin dipakai untuk mengatur domain aktif public/private dan menu operasional.
