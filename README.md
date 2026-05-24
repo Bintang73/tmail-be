@@ -653,6 +653,79 @@ Response:
 { "api": "ok", "redis": "ok", "smtp": "ok" }
 ```
 
+```http
+GET /api/v1/system/status
+X-Admin-Token: change-me-admin-token
+```
+
+Menampilkan status operasional detail untuk monitoring internal. Endpoint ini memakai admin token karena response berisi informasi server.
+
+Isi response meliputi:
+
+- uptime aplikasi dan host
+- current downtime status aplikasi, Redis, dan Haraka
+- CPU usage total dan per core
+- RAM usage sistem dan process API
+- status Redis, latency, uptime, memory, client, dan Redis Stream queue email
+- status Haraka SMTP berdasarkan koneksi TCP ke host/port health check
+- status storage email dan spool, termasuk disk usage jika runtime mendukung `statfs`
+- status WebSocket
+
+Default host health check Haraka:
+
+```env
+HARAKA_HEALTH_HOST=127.0.0.1
+```
+
+Jika API dan Haraka berjalan di container berbeda, set `HARAKA_HEALTH_HOST` ke hostname service Haraka, misalnya:
+
+```env
+HARAKA_HEALTH_HOST=haraka
+```
+
+Contoh response ringkas:
+
+```json
+{
+  "status": "ok",
+  "timestamp": 1710000000000,
+  "app": {
+    "name": "tmail-be",
+    "env": "production",
+    "pid": 123,
+    "uptime_seconds": 3600,
+    "current_downtime": { "active": false, "seconds": 0 }
+  },
+  "cpu": {
+    "cores": 4,
+    "usage_percent": 12.5
+  },
+  "memory": {
+    "system": {
+      "total_mb": 8192,
+      "used_mb": 4096,
+      "usage_percent": 50
+    }
+  },
+  "services": {
+    "redis": {
+      "online": true,
+      "latency_ms": 2,
+      "uptime_seconds": 86400
+    },
+    "haraka": {
+      "online": true,
+      "host": "127.0.0.1",
+      "port": 2525
+    },
+    "api": {
+      "online": true,
+      "port": 3000
+    }
+  }
+}
+```
+
 ## Admin Domain API
 
 List semua domain aktif, termasuk private:

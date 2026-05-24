@@ -8,7 +8,8 @@ import {
   inbox,
   incomingDomains,
   messageById,
-  publicDomains
+  publicDomains,
+  systemStatus
 } from '../controllers/emailController.js';
 import {
   adminAddDomain,
@@ -34,6 +35,7 @@ emailRoutes.get('/domains', publicDomains);
 emailRoutes.get('/domains/status', domainStatus);
 emailRoutes.get('/domains/:domain/status', domainStatus);
 emailRoutes.get('/health', health);
+emailRoutes.get('/system/status', requireAdmin, systemStatus);
 
 emailRoutes.get('/admin/domains', requireAdmin, adminListDomains);
 emailRoutes.post('/admin/domains', requireAdmin, adminAddDomain);

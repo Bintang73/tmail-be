@@ -3,6 +3,7 @@ import { getDomainStatus, getPublicDomainForGenerate, listDomains } from '../ser
 import { getInboxMessages } from '../services/inboxService.js';
 import { listIncomingDomains } from '../services/incomingDomainService.js';
 import { deleteInboxEverywhere, deleteMessageEverywhere } from '../services/messageDeleteService.js';
+import { getSystemStatus } from '../services/systemStatusService.js';
 import { getRedis } from '../storage/redis.js';
 import { generateRandomEmail, isValidDomain, isValidEmail, normalizeDomain, normalizeEmail } from '../utils/email.js';
 
@@ -128,4 +129,13 @@ export const health = async (req, res) => {
     redis,
     smtp: 'ok'
   });
+};
+
+export const systemStatus = async (req, res, next) => {
+  try {
+    const status = await getSystemStatus();
+    return res.status(status.status === 'ok' ? 200 : 503).json(status);
+  } catch (error) {
+    return next(error);
+  }
 };

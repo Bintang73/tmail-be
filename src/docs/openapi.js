@@ -62,6 +62,19 @@ export const openApiSpec = {
           required_mx: { type: 'string' },
           active_reason: { type: 'string' }
         }
+      },
+      SystemStatus: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', enum: ['ok', 'degraded'] },
+          timestamp: { type: 'integer', format: 'int64' },
+          app: { type: 'object' },
+          host: { type: 'object' },
+          cpu: { type: 'object' },
+          memory: { type: 'object' },
+          services: { type: 'object' },
+          storage: { type: 'object' }
+        }
       }
     }
   },
@@ -275,6 +288,25 @@ export const openApiSpec = {
         responses: {
           200: { description: 'Healthy' },
           503: { description: 'Redis unavailable' }
+        }
+      }
+    },
+    '/system/status': {
+      get: {
+        summary: 'Detailed system and dependency status',
+        description:
+          'Admin-only operational status with app and host uptime, current dependency downtime state, CPU usage, RAM usage, Redis details, Haraka TCP health, queue metrics, storage, and WebSocket status.',
+        security: [{ AdminToken: [] }],
+        responses: {
+          200: {
+            description: 'System is healthy',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/SystemStatus' } } }
+          },
+          503: {
+            description: 'One or more dependencies are degraded',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/SystemStatus' } } }
+          },
+          401: { description: 'Unauthorized' }
         }
       }
     },

@@ -31,6 +31,7 @@ export const config = {
   redisPort: toInt(process.env.REDIS_PORT, 6379),
   redisPassword: process.env.REDIS_PASSWORD || 'd0535500cb173f97',
   redisUrl: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
+  harakaHealthHost: process.env.HARAKA_HEALTH_HOST || '127.0.0.1',
   emailStorageDir: path.resolve(rootDir, process.env.EMAIL_STORAGE_DIR || './emails'),
   emailSpoolDir: path.resolve(rootDir, process.env.EMAIL_SPOOL_DIR || './spool/emails'),
   emailTtlSeconds: toInt(process.env.EMAIL_TTL_SECONDS, 86400),
