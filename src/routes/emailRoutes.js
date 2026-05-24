@@ -6,6 +6,7 @@ import {
   generate,
   health,
   inbox,
+  incomingDomains,
   messageById,
   publicDomains
 } from '../controllers/emailController.js';
@@ -16,15 +17,19 @@ import {
   adminDeleteDomainMessages,
   adminListDomains
 } from '../controllers/adminController.js';
+import { swaggerJson, swaggerUi } from '../controllers/swaggerController.js';
 import { requireAdmin } from '../middleware/adminAuth.js';
 
 export const emailRoutes = Router();
 
 emailRoutes.get('/generate', generate);
+emailRoutes.get('/swagger', swaggerUi);
+emailRoutes.get('/swagger.json', swaggerJson);
 emailRoutes.get('/inbox', inbox);
 emailRoutes.delete('/inbox', requireAdmin, deleteInbox);
 emailRoutes.get('/messages/:id', messageById);
 emailRoutes.delete('/messages/:id', requireAdmin, deleteMessageById);
+emailRoutes.get('/list-domain', incomingDomains);
 emailRoutes.get('/domains', publicDomains);
 emailRoutes.get('/domains/status', domainStatus);
 emailRoutes.get('/domains/:domain/status', domainStatus);

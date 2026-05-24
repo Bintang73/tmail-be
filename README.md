@@ -479,6 +479,30 @@ example.com.  MX 10 mx.thvuinin.my.id.
 
 Base URL: `/api/v1`
 
+Dokumentasi Swagger/OpenAPI tersedia di:
+
+```http
+GET /api/v1/swagger
+```
+
+Endpoint ini menampilkan Swagger UI dan bisa dibuka dari browser saat API berjalan, misalnya:
+
+```txt
+http://127.0.0.1:3000/api/v1/swagger
+```
+
+Jika API dipublish lewat domain atau Cloudflare Tunnel, buka URL yang sama di host online:
+
+```txt
+https://api.example.com/api/v1/swagger
+```
+
+OpenAPI JSON mentah tersedia di:
+
+```http
+GET /api/v1/swagger.json
+```
+
 ```http
 GET /api/v1/generate
 ```
@@ -539,6 +563,36 @@ X-Admin-Token: change-me-admin-token
 ```
 
 Hapus semua pesan yang ada di inbox email tersebut.
+
+```http
+GET /api/v1/list-domain?page=1&limit=20
+```
+
+Menampilkan semua domain penerima yang pernah masuk ke sistem dan sudah diproses worker. Domain disimpan di Redis lokal saat email inbound diproses. Endpoint memakai pagination agar response tidak terlalu besar.
+
+Query parameter:
+
+- `page`: nomor halaman, default `1`
+- `limit`: jumlah domain per halaman, default `20`, maksimal `20`
+
+Response:
+
+```json
+{
+  "page": 1,
+  "limit": 20,
+  "total_domains": 45,
+  "total_pages": 3,
+  "last_page": 3,
+  "domains": [
+    {
+      "domain": "example.com",
+      "last_seen_at": 1710000000000,
+      "total_messages": 12
+    }
+  ]
+}
+```
 
 ```http
 GET /api/v1/domains

@@ -5,6 +5,7 @@ import { saveEmailFile } from './fileStorageService.js';
 import { normalizeEmail } from '../utils/email.js';
 import { publishInboxUpdate } from './realtimeService.js';
 import { detectOtp } from './otpDetectionService.js';
+import { trackIncomingDomains } from './incomingDomainService.js';
 
 const addressList = (value) => {
   if (!value?.value) return [];
@@ -16,6 +17,8 @@ export const processRawEmail = async ({ raw, recipients }) => {
   const toAddresses = recipients?.length ? recipients.map(normalizeEmail) : addressList(parsed.to);
   const id = uuidv4();
   const createdAt = Date.now();
+
+  await trackIncomingDomains(toAddresses);
 
   const message = {
     id,

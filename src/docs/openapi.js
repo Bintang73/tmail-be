@@ -1,0 +1,349 @@
+export const openApiSpec = {
+  openapi: '3.0.3',
+  info: {
+    title: 'Temporary Email Backend API',
+    version: '1.0.0',
+    description: 'Inbound-only temporary email API with Haraka, Redis, workers, WebSocket, and domain tracking.'
+  },
+  servers: [
+    {
+      url: '/api/v1',
+      description: 'Current API host'
+    }
+  ],
+  components: {
+    securitySchemes: {
+      AdminToken: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-Admin-Token'
+      }
+    },
+    schemas: {
+      Error: {
+        type: 'object',
+        properties: {
+          error: { type: 'string' }
+        }
+      },
+      InboxMessage: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          from: { type: 'string' },
+          subject: { type: 'string' },
+          timestamp: { type: 'integer', format: 'int64' }
+        }
+      },
+      IncomingDomain: {
+        type: 'object',
+        properties: {
+          domain: { type: 'string', example: 'example.com' },
+          last_seen_at: { type: 'integer', format: 'int64' },
+          total_messages: { type: 'integer', example: 12 }
+        }
+      },
+      DomainStatus: {
+        type: 'object',
+        properties: {
+          domain: { type: 'string' },
+          active: { type: 'boolean' },
+          approved: { type: 'boolean' },
+          approved_at: { type: 'integer', nullable: true },
+          uptime_seconds: { type: 'integer' },
+          uptime_days: { type: 'integer' },
+          uptime_label: { type: 'string', nullable: true },
+          status_label: { type: 'string' },
+          registered: { type: 'boolean' },
+          visibility: { type: 'string', nullable: true },
+          built_in: { type: 'boolean' },
+          mx_valid: { type: 'boolean' },
+          required_mx: { type: 'string' },
+          active_reason: { type: 'string' }
+        }
+      }
+    }
+  },
+  paths: {
+    '/generate': {
+      get: {
+        summary: 'Generate a temporary email address',
+        parameters: [
+          {
+            name: 'domain',
+            in: 'query',
+            required: false,
+            schema: { type: 'string' },
+            description: 'Optional public registered domain.'
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Generated address',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    email: { type: 'string', example: 'abc123@thvuinin.my.id' },
+                    domain: { type: 'string', example: 'thvuinin.my.id' }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    '/inbox': {
+      get: {
+        summary: 'Read inbox messages',
+        parameters: [
+          {
+            name: 'email',
+            in: 'query',
+            required: true,
+            schema: { type: 'string', format: 'email' }
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Inbox message list',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    email: { type: 'string' },
+                    messages: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/InboxMessage' }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          400: { description: 'Invalid email', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } }
+        }
+      },
+      delete: {
+        summary: 'Delete all messages in an inbox',
+        security: [{ AdminToken: [] }],
+        parameters: [
+          {
+            name: 'email',
+            in: 'query',
+            required: true,
+            schema: { type: 'string', format: 'email' }
+          }
+        ],
+        responses: {
+          200: { description: 'Inbox deleted' },
+          401: { description: 'Unauthorized' }
+        }
+      }
+    },
+    '/messages/{id}': {
+      get: {
+        summary: 'Read message detail',
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', format: 'uuid' }
+          }
+        ],
+        responses: {
+          200: { description: 'Message detail' },
+          404: { description: 'Message not found' }
+        }
+      },
+      delete: {
+        summary: 'Delete a message',
+        security: [{ AdminToken: [] }],
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', format: 'uuid' }
+          }
+        ],
+        responses: {
+          200: { description: 'Message deleted' },
+          404: { description: 'Message not found' },
+          401: { description: 'Unauthorized' }
+        }
+      }
+    },
+    '/list-domain': {
+      get: {
+        summary: 'List domains seen from incoming email',
+        description: 'Returns unique recipient domains recorded when inbound email is processed. Page size is capped at 20.',
+        parameters: [
+          {
+            name: 'page',
+            in: 'query',
+            required: false,
+            schema: { type: 'integer', minimum: 1, default: 1 }
+          },
+          {
+            name: 'limit',
+            in: 'query',
+            required: false,
+            schema: { type: 'integer', minimum: 1, maximum: 20, default: 20 }
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Paginated incoming domains',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    page: { type: 'integer' },
+                    limit: { type: 'integer' },
+                    total_domains: { type: 'integer' },
+                    total_pages: { type: 'integer' },
+                    last_page: { type: 'integer' },
+                    domains: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/IncomingDomain' }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    '/domains': {
+      get: {
+        summary: 'List public domains available for generation',
+        responses: {
+          200: { description: 'Public domains' }
+        }
+      }
+    },
+    '/domains/status': {
+      get: {
+        summary: 'Check domain status',
+        parameters: [
+          {
+            name: 'domain',
+            in: 'query',
+            required: true,
+            schema: { type: 'string' }
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Domain status',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/DomainStatus' } } }
+          }
+        }
+      }
+    },
+    '/domains/{domain}/status': {
+      get: {
+        summary: 'Check domain status by path parameter',
+        parameters: [
+          {
+            name: 'domain',
+            in: 'path',
+            required: true,
+            schema: { type: 'string' }
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Domain status',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/DomainStatus' } } }
+          }
+        }
+      }
+    },
+    '/health': {
+      get: {
+        summary: 'Health check',
+        responses: {
+          200: { description: 'Healthy' },
+          503: { description: 'Redis unavailable' }
+        }
+      }
+    },
+    '/admin/domains': {
+      get: {
+        summary: 'Admin list all active domains',
+        security: [{ AdminToken: [] }],
+        responses: {
+          200: { description: 'All active domains' },
+          401: { description: 'Unauthorized' }
+        }
+      },
+      post: {
+        summary: 'Admin add domain',
+        security: [{ AdminToken: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['domain'],
+                properties: {
+                  domain: { type: 'string', example: 'example.com' },
+                  visibility: { type: 'string', enum: ['public', 'private'], default: 'public' },
+                  verify_mx: { type: 'boolean', default: true }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          201: { description: 'Domain created' },
+          401: { description: 'Unauthorized' },
+          422: { description: 'MX does not point to required host' }
+        }
+      }
+    },
+    '/admin/domains/{domain}/status': {
+      get: {
+        summary: 'Admin check domain status',
+        security: [{ AdminToken: [] }],
+        parameters: [{ name: 'domain', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          200: { description: 'Domain status' },
+          401: { description: 'Unauthorized' }
+        }
+      }
+    },
+    '/admin/domains/{domain}': {
+      delete: {
+        summary: 'Admin delete domain',
+        security: [{ AdminToken: [] }],
+        parameters: [{ name: 'domain', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          200: { description: 'Domain deleted' },
+          404: { description: 'Domain not found' },
+          401: { description: 'Unauthorized' }
+        }
+      }
+    },
+    '/admin/domains/{domain}/messages': {
+      delete: {
+        summary: 'Admin delete all messages for a domain',
+        security: [{ AdminToken: [] }],
+        parameters: [{ name: 'domain', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          200: { description: 'Domain messages deleted' },
+          401: { description: 'Unauthorized' }
+        }
+      }
+    }
+  }
+};
