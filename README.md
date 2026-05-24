@@ -568,7 +568,7 @@ Hapus semua pesan yang ada di inbox email tersebut.
 GET /api/v1/list-domain?page=1&limit=20
 ```
 
-Menampilkan semua domain penerima yang pernah masuk ke sistem dan sudah diproses worker. Domain disimpan di Redis lokal saat email inbound diproses. Endpoint memakai pagination agar response tidak terlalu besar.
+Menampilkan domain penerima yang pernah masuk ke sistem, sudah diproses worker, dan MX domainnya valid mengarah ke `REQUIRED_MX_HOST`. Domain yang tidak terkoneksi ke MX sistem tidak disimpan ke list ini. Data disimpan di Redis lokal saat email inbound diproses. Endpoint memakai pagination agar response tidak terlalu besar.
 
 Query parameter:
 
@@ -588,7 +588,8 @@ Response:
     {
       "domain": "example.com",
       "last_seen_at": 1710000000000,
-      "total_messages": 12
+      "total_messages": 12,
+      "mx_valid": true
     }
   ]
 }

@@ -1,8 +1,24 @@
+import { checkDomainMx } from './domainService.js';
 import { getRedis } from '../storage/redis.js';
 import { getDomainFromEmail, isValidDomain, normalizeDomain, normalizeEmail } from '../utils/email.js';
 
-const incomingDomainsKey = 'domains:incoming';
+const incomingDomainsKey = 'domains:incoming:mx_valid';
 const incomingDomainCountKey = (domain) => `domain_incoming_count:${normalizeDomain(domain)}`;
+
+const getMxConnectedDomains = async (domains) => {
+  const connected = [];
+
+  for (const domain of domains) {
+    try {
+      const mx = await checkDomainMx(domain);
+      if (mx.valid) connected.push(domain);
+    } catch (error) {
+      // Invalid or unresolvable domains are intentionally skipped.
+    }
+  }
+
+  return connected;
+};
 
 export const trackIncomingDomains = async (emails = []) => {
   const domains = [
@@ -17,17 +33,20 @@ export const trackIncomingDomains = async (emails = []) => {
 
   if (!domains.length) return [];
 
+  const connectedDomains = await getMxConnectedDomains(domains);
+  if (!connectedDomains.length) return [];
+
   const redis = getRedis();
   const now = Date.now();
   const multi = redis.multi();
 
-  for (const domain of domains) {
+  for (const domain of connectedDomains) {
     multi.zadd(incomingDomainsKey, now, domain);
     multi.incr(incomingDomainCountKey(domain));
   }
 
   await multi.exec();
-  return domains;
+  return connectedDomains;
 };
 
 export const listIncomingDomains = async ({ page = 1, limit = 20 } = {}) => {
@@ -47,7 +66,8 @@ export const listIncomingDomains = async ({ page = 1, limit = 20 } = {}) => {
     rows.push({
       domain,
       last_seen_at: Number(domains[index + 1] || 0),
-      total_messages: Number(await redis.get(incomingDomainCountKey(domain))) || 0
+      total_messages: Number(await redis.get(incomingDomainCountKey(domain))) || 0,
+      mx_valid: true
     });
   }
 

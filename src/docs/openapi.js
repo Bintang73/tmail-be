@@ -40,7 +40,8 @@ export const openApiSpec = {
         properties: {
           domain: { type: 'string', example: 'example.com' },
           last_seen_at: { type: 'integer', format: 'int64' },
-          total_messages: { type: 'integer', example: 12 }
+          total_messages: { type: 'integer', example: 12 },
+          mx_valid: { type: 'boolean', example: true }
         }
       },
       DomainStatus: {
@@ -181,7 +182,8 @@ export const openApiSpec = {
     '/list-domain': {
       get: {
         summary: 'List domains seen from incoming email',
-        description: 'Returns unique recipient domains recorded when inbound email is processed. Page size is capped at 20.',
+        description:
+          'Returns unique recipient domains recorded when inbound email is processed and the domain MX points to the configured required MX host. Page size is capped at 20.',
         parameters: [
           {
             name: 'page',
