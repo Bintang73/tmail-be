@@ -9,6 +9,7 @@ import {
   incomingDomains,
   messageById,
   publicDomains,
+  randomDomains,
   systemStatus
 } from '../controllers/emailController.js';
 import {
@@ -32,6 +33,7 @@ emailRoutes.get('/messages/:id', messageById);
 emailRoutes.delete('/messages/:id', requireAdmin, deleteMessageById);
 emailRoutes.get('/list-domain', incomingDomains);
 emailRoutes.get('/domains', publicDomains);
+emailRoutes.get('/random-domain', randomDomains);
 emailRoutes.get('/domains/status', domainStatus);
 emailRoutes.get('/domains/:domain/status', domainStatus);
 emailRoutes.get('/health', health);

@@ -12,11 +12,12 @@ Backend inbound-only untuk temporary email. Sistem menerima SMTP via Haraka, mem
 - Spool raw email lokal di `spool/emails/YYYY-MM-DD/HH/*.eml`.
 - File cold storage sharded di `emails/YYYY-MM-DD/aa/bb/{uuid}.json`.
 - Express API `/api/v1`.
-- Rate limit API, validasi email input, limit 50 email per inbox per hari.
+- Validasi email input dan limit 50 email per inbox per hari.
 - Worker email queue untuk parse raw email async.
 - Worker cleanup file email lebih dari 1 hari.
 - WebSocket update inbox saat email masuk.
 - Admin API untuk tambah/hapus domain aktif dan hapus pesan.
+- Admin web `/admin` untuk mengatur whitelist IP akses API/WebSocket.
 - Deteksi OTP otomatis dengan regex lokal, fallback OpenAI opsional, dan Redis template learning agar tidak hit AI terus-menerus untuk pola email yang sama.
 
 ## Setup
@@ -32,6 +33,32 @@ Set `ADMIN_TOKEN` di `.env`. Semua endpoint admin dan delete memakai header:
 X-Admin-Token: change-me-admin-token
 ```
 
+Admin web tersedia di:
+
+```txt
+/admin
+```
+
+Default password:
+
+```txt
+Premium@123
+```
+
+Sebaiknya override di production:
+
+```env
+ADMIN_WEB_PASSWORD=password-kuat
+ADMIN_SESSION_SECRET=random-secret-panjang
+```
+
+Menu `/admin` dipakai untuk memilih mode akses:
+
+- `All IP`: semua IP bisa akses API dan WebSocket.
+- `Whitelist only`: hanya IP di whitelist yang bisa akses API dan WebSocket.
+
+Endpoint `/admin` sendiri selalu bisa diakses tanpa whitelist supaya admin tidak terkunci dari menu pengaturan.
+
 ## Cloudflare Tunnel
 
 Cloudflare Tunnel bisa dipakai untuk Express API dan WebSocket saja:
@@ -42,7 +69,7 @@ wss://api.example.com/ws -> ws://127.0.0.1:3000/ws
 ```
 
 Redis tetap lokal, dan Haraka SMTP tetap harus menerima email lewat MX/port 25 langsung ke VPS. Jangan arahkan SMTP melalui Cloudflare Tunnel.
-API memakai `TRUST_PROXY=1` supaya Express membaca IP client dari proxy/tunnel dan `express-rate-limit` tidak error saat menerima header `X-Forwarded-For`. Jika API benar-benar diekspos langsung tanpa reverse proxy, set `TRUST_PROXY=0`.
+API memakai `TRUST_PROXY=1` supaya Express membaca IP client dari proxy/tunnel. Jika API benar-benar diekspos langsung tanpa reverse proxy, set `TRUST_PROXY=0`.
 
 Untuk development cepat tanpa named tunnel, install `cloudflared`, lalu set di `.env`:
 
@@ -328,9 +355,9 @@ EMAIL_QUEUE_BATCH_SIZE=10
 EMAIL_QUEUE_MAXLEN=100000
 DOMAIN_MX_CACHE_TTL_SECONDS=3600
 
-API_RATE_LIMIT_WINDOW_MS=60000
-API_RATE_LIMIT_MAX=120
 ADMIN_TOKEN=ganti-token-admin-kuat
+ADMIN_WEB_PASSWORD=Premium@123
+ADMIN_SESSION_SECRET=random-secret-panjang
 
 OPENAI_API_KEY=sk-proj-your-openai-api-key
 OPENAI_MODEL=gpt-4.1-mini
@@ -743,6 +770,32 @@ Response:
       "built_in": true
     }
   ]
+}
+```
+
+#### Random Public Domains
+
+```http
+GET /api/v1/random-domain
+```
+
+Menampilkan domain public aktif secara acak, maksimal 10 domain.
+
+Response:
+
+```json
+{
+  "domains": [
+    {
+      "domain": "thvuinin.my.id",
+      "visibility": "public",
+      "created_at": 0,
+      "updated_at": 0,
+      "built_in": true
+    }
+  ],
+  "total_domains": 1,
+  "limit": 10
 }
 ```
 

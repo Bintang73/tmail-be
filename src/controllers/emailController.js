@@ -7,6 +7,15 @@ import { getSystemStatus } from '../services/systemStatusService.js';
 import { getRedis } from '../storage/redis.js';
 import { generateRandomEmail, isValidDomain, isValidEmail, normalizeDomain, normalizeEmail } from '../utils/email.js';
 
+const randomize = (items) => {
+  const shuffled = [...items];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+  }
+  return shuffled;
+};
+
 export const generate = async (req, res, next) => {
   try {
     const domain = await getPublicDomainForGenerate(req.query.domain);
@@ -84,6 +93,21 @@ export const publicDomains = async (req, res, next) => {
   try {
     const domains = await listDomains({ includePrivate: false });
     return res.json({ domains });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const randomDomains = async (req, res, next) => {
+  try {
+    const domains = await listDomains({ includePrivate: false });
+    const randomDomains = randomize(domains).slice(0, 10);
+
+    return res.json({
+      domains: randomDomains,
+      total_domains: domains.length,
+      limit: 10
+    });
   } catch (error) {
     return next(error);
   }

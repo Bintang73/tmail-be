@@ -1,4 +1,5 @@
 import { WebSocketServer } from 'ws';
+import { isIpAllowed, normalizeClientIp } from './accessControlService.js';
 import { createRedisClient, getRedis } from '../storage/redis.js';
 import { isValidEmail, normalizeEmail } from '../utils/email.js';
 
@@ -6,10 +7,26 @@ const channel = 'inbox_updates';
 const subscriptions = new Map();
 let subscriber;
 
+const getSocketClientIp = (request) => {
+  const forwardedFor = String(request.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  return normalizeClientIp(forwardedFor || request.socket.remoteAddress);
+};
+
 export const attachWebSocketServer = (server) => {
   const wss = new WebSocketServer({ server, path: '/ws' });
 
-  wss.on('connection', (socket, request) => {
+  wss.on('connection', async (socket, request) => {
+    const clientIp = getSocketClientIp(request);
+    try {
+      if (!(await isIpAllowed(clientIp))) {
+        socket.close(1008, 'IP is not whitelisted');
+        return;
+      }
+    } catch (error) {
+      socket.close(1011, 'Access check failed');
+      return;
+    }
+
     const url = new URL(request.url, 'http://localhost');
     const email = normalizeEmail(url.searchParams.get('email'));
 

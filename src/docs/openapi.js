@@ -44,6 +44,16 @@ export const openApiSpec = {
           mx_valid: { type: 'boolean', example: true }
         }
       },
+      PublicDomain: {
+        type: 'object',
+        properties: {
+          domain: { type: 'string', example: 'thvuinin.my.id' },
+          visibility: { type: 'string', enum: ['public'], example: 'public' },
+          created_at: { type: 'integer', format: 'int64', example: 0 },
+          updated_at: { type: 'integer', format: 'int64', example: 0 },
+          built_in: { type: 'boolean', example: true }
+        }
+      },
       DomainStatus: {
         type: 'object',
         properties: {
@@ -272,7 +282,73 @@ export const openApiSpec = {
       get: {
         summary: 'List public domains available for generation',
         responses: {
-          200: { description: 'Public domains' }
+          200: {
+            description: 'Public domains',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    domains: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/PublicDomain' }
+                    }
+                  }
+                },
+                example: {
+                  domains: [
+                    {
+                      domain: 'thvuinin.my.id',
+                      visibility: 'public',
+                      created_at: 0,
+                      updated_at: 0,
+                      built_in: true
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    '/random-domain': {
+      get: {
+        summary: 'List up to 10 random public domains',
+        description: 'Returns active public domains in random order. Private domains are not included.',
+        responses: {
+          200: {
+            description: 'Random public domains',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    domains: {
+                      type: 'array',
+                      maxItems: 10,
+                      items: { $ref: '#/components/schemas/PublicDomain' }
+                    },
+                    total_domains: { type: 'integer' },
+                    limit: { type: 'integer', example: 10 }
+                  }
+                },
+                example: {
+                  domains: [
+                    {
+                      domain: 'thvuinin.my.id',
+                      visibility: 'public',
+                      created_at: 0,
+                      updated_at: 0,
+                      built_in: true
+                    }
+                  ],
+                  total_domains: 1,
+                  limit: 10
+                }
+              }
+            }
+          }
         }
       }
     },

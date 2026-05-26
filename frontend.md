@@ -43,6 +43,7 @@ Jika `ADMIN_TOKEN` belum diset, endpoint admin mengembalikan `503`.
 | Delete message | Sudah ada | Belum ada di repo ini | Admin token required. |
 | Delete inbox | Sudah ada | Belum ada di repo ini | Admin token required. |
 | Public domain list | Sudah ada | Belum ada di repo ini | Untuk pilihan domain saat generate. |
+| Random public domain list | Sudah ada | Belum ada di repo ini | Maksimal 10 domain acak untuk UI/domain suggestion. |
 | Incoming MX-valid domain list | Sudah ada | Belum ada di repo ini | Pagination 20 item per halaman. |
 | Domain status check | Sudah ada | Belum ada di repo ini | Bisa dipakai untuk validasi custom domain. |
 | Admin domain registry | Sudah ada | Belum ada di repo ini | Add/delete/list/check domain. |
@@ -61,6 +62,7 @@ Fitur frontend yang perlu dibuat:
 
 - Generate email random.
 - Pilih domain public dari `GET /api/v1/domains`.
+- Tampilkan opsi domain acak dari `GET /api/v1/random-domain` jika UI butuh suggestion ringkas.
 - Copy email ke clipboard.
 - Tampilkan inbox message list.
 - Buka message detail.
@@ -75,6 +77,7 @@ Endpoint terkait:
 - `GET /api/v1/generate`
 - `GET /api/v1/generate?domain=example.com`
 - `GET /api/v1/domains`
+- `GET /api/v1/random-domain`
 - `GET /api/v1/inbox?email=...`
 - `GET /api/v1/messages/:id`
 - `WS /ws?email=...`
@@ -275,6 +278,37 @@ Frontend behavior:
 - Pakai untuk select domain pada generate email.
 - Hanya domain public yang muncul.
 - Domain private tidak tampil dan tidak bisa dipilih public.
+
+### Random Public Domains
+
+```http
+GET /api/v1/random-domain
+```
+
+Response:
+
+```json
+{
+  "domains": [
+    {
+      "domain": "thvuinin.my.id",
+      "visibility": "public",
+      "created_at": 0,
+      "updated_at": 0,
+      "built_in": true
+    }
+  ],
+  "total_domains": 1,
+  "limit": 10
+}
+```
+
+Frontend behavior:
+
+- Pakai untuk menampilkan domain suggestion secara acak.
+- Maksimal 10 domain dikembalikan.
+- Hanya domain public yang muncul.
+- Domain private tidak tampil.
 
 ### List Incoming Domains
 
@@ -684,7 +718,6 @@ Status yang perlu ditangani:
 - `404`: resource tidak ditemukan atau domain public tidak tersedia.
 - `409`: konflik, misalnya delete built-in base domain.
 - `422`: MX domain tidak sesuai requirement.
-- `429`: rate limit API.
 - `503`: admin API belum dikonfigurasi, Redis error, atau dependency degraded.
 
 ## Data Expiry dan Storage
@@ -706,6 +739,7 @@ Gunakan checklist ini untuk melacak integrasi frontend.
 
 - [ ] Generate email default.
 - [ ] Generate email dengan domain public pilihan.
+- [ ] Random public domain suggestions.
 - [ ] Copy email.
 - [ ] Load inbox.
 - [ ] Empty state inbox.
