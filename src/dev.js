@@ -17,14 +17,19 @@ const cloudflareTunnelEnabled = process.env.CLOUDFLARE_TUNNEL_ENABLED === 'true'
 
 const run = (name, command, args, options = {}) => {
   const child = spawn(command, args, {
-    stdio: 'inherit',
+    stdio: options.detached ? 'ignore' : 'inherit',
     env: {
       ...process.env,
       NODE_ENV: process.env.NODE_ENV || 'development',
       ...options.env
     },
+    detached: Boolean(options.detached),
     shell: false
   });
+
+  if (options.detached) {
+    child.unref();
+  }
 
   child.on('exit', (code, signal) => {
     if (shuttingDown) return;
@@ -33,7 +38,10 @@ const run = (name, command, args, options = {}) => {
     shutdown(code || 1);
   });
 
-  processes.push(child);
+  processes.push({
+    child,
+    preserveOnShutdown: Boolean(options.preserveOnShutdown)
+  });
   return child;
 };
 
@@ -41,7 +49,8 @@ let shuttingDown = false;
 
 const shutdown = (code = 0) => {
   shuttingDown = true;
-  for (const child of processes) {
+  for (const { child, preserveOnShutdown } of processes) {
+    if (preserveOnShutdown) continue;
     if (!child.killed) child.kill('SIGTERM');
   }
   process.exit(code);
@@ -82,6 +91,36 @@ const commandSucceeds = (command, args) =>
     child.once('exit', (code) => resolve(code === 0));
   });
 
+const runOneShot = (command, args) =>
+  new Promise((resolve) => {
+    const child = spawn(command, args, { stdio: 'ignore' });
+    child.once('error', () => resolve(false));
+    child.once('exit', (code) => resolve(code === 0));
+  });
+
+const ensureDockerRedis = async () => {
+  if (await commandSucceeds('docker', ['container', 'inspect', redisContainerName])) {
+    return runOneShot('docker', ['start', redisContainerName]);
+  }
+
+  return runOneShot('docker', [
+    'run',
+    '-d',
+    '--name',
+    redisContainerName,
+    '-p',
+    `${redisPort}:6379`,
+    'redis:7-alpine',
+    'redis-server',
+    '--requirepass',
+    redisPassword,
+    '--save',
+    '',
+    '--appendonly',
+    'no'
+  ]);
+};
+
 if (!(await canConnect(redisHost, redisPort))) {
   if (await commandExists('redis-server')) {
     run('redis', 'redis-server', [
@@ -93,7 +132,7 @@ if (!(await canConnect(redisHost, redisPort))) {
       '',
       '--appendonly',
       'no'
-    ]);
+    ], { detached: true, fatal: false, preserveOnShutdown: true });
     await new Promise((resolve) => setTimeout(resolve, 600));
   } else if (await commandExists('docker')) {
     if (!(await commandSucceeds('docker', ['info']))) {
@@ -103,18 +142,10 @@ if (!(await canConnect(redisHost, redisPort))) {
       process.exit(1);
     }
 
-    run('redis', 'docker', [
-      'run',
-      '--rm',
-      '--name',
-      redisContainerName,
-      '-p',
-      `${redisPort}:6379`,
-      'redis:7-alpine',
-      'redis-server',
-      '--requirepass',
-      redisPassword
-    ], { fatal: false });
+    if (!(await ensureDockerRedis())) {
+      console.error(`[dev] Failed to start Docker Redis container ${redisContainerName}.`);
+      process.exit(1);
+    }
     await new Promise((resolve) => setTimeout(resolve, 1500));
   } else {
     console.error(`[dev] Redis is not running at ${redisHost}:${redisPort}.`);

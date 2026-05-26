@@ -199,6 +199,21 @@ bun dev
 Command ini menjalankan Redis jika `redis-server` tersedia. Jika tidak, command akan mencoba menjalankan Docker container `redis:7-alpine`. Setelah itu API, worker cleanup, dan Haraka ikut dijalankan. Port Haraka dibaca dari `HARAKA_SMTP_PORT` di `.env`.
 Redis dev akan dijalankan dengan `requirepass` dari `REDIS_PASSWORD`.
 
+Redis dev dibuat tetap hidup saat `bun dev` dihentikan, sehingga data seperti domain registry dan whitelist IP tidak hilang hanya karena script backend direstart. Redis dev tetap volatile karena persistence disk dimatikan; data akan hilang jika proses/container Redis dimatikan manual atau server reboot.
+
+Untuk menghentikan Redis dev manual:
+
+```bash
+redis-cli -a d0535500cb173f97 shutdown
+```
+
+Jika Redis dev berjalan lewat Docker:
+
+```bash
+docker stop tmail-redis-dev
+docker rm tmail-redis-dev
+```
+
 Jika muncul pesan Redis belum tersedia dan Docker juga tidak siap, install Redis dulu:
 
 ```bash
