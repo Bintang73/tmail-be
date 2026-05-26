@@ -279,7 +279,7 @@ Frontend behavior:
 - Hanya domain public yang muncul.
 - Domain private tidak tampil dan tidak bisa dipilih public.
 
-### Random Public Domains
+### Random Incoming Domains
 
 ```http
 GET /api/v1/random-domain
@@ -292,23 +292,24 @@ Response:
   "domains": [
     {
       "domain": "thvuinin.my.id",
-      "visibility": "public",
-      "created_at": 0,
-      "updated_at": 0,
-      "built_in": true
+      "last_seen_at": 1779811148095,
+      "total_messages": 8,
+      "mx_valid": true,
+      "source": "incoming"
     }
   ],
-  "total_domains": 1,
+  "total_domains": 5,
   "limit": 10
 }
 ```
 
 Frontend behavior:
 
-- Pakai untuk menampilkan domain suggestion secara acak.
+- Pakai untuk menampilkan suggestion dari domain incoming yang sudah MX-valid.
 - Maksimal 10 domain dikembalikan.
-- Hanya domain public yang muncul.
-- Domain private tidak tampil.
+- Sumber data digabung dari `/list-domain` dan domain yang pernah lolos check status MX.
+- Domain yang sama hanya tampil sekali.
+- `source=incoming` berarti dari email inbound, `source=mx_status` berarti dari check status domain.
 
 ### List Incoming Domains
 

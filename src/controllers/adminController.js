@@ -1,4 +1,5 @@
 import { addDomain, getDomainStatus, listDomains, removeDomain } from '../services/domainService.js';
+import { trackCheckedMxDomain } from '../services/incomingDomainService.js';
 import { deleteDomainMessages } from '../services/messageDeleteService.js';
 import { isValidDomain, normalizeDomain } from '../utils/email.js';
 
@@ -26,6 +27,10 @@ export const adminAddDomain = async (req, res, next) => {
     const verifyMx = req.body.verify_mx !== false;
 
     const created = await addDomain({ domain, visibility, verifyMx });
+    const status = await getDomainStatus(created.domain);
+    if (status.mx_valid) {
+      await trackCheckedMxDomain(status.domain);
+    }
     return res.status(201).json({ domain: created });
   } catch (error) {
     return handleError(error, res, next);
@@ -68,6 +73,9 @@ export const adminDomainStatus = async (req, res, next) => {
     }
 
     const status = await getDomainStatus(domain);
+    if (status.mx_valid) {
+      await trackCheckedMxDomain(status.domain);
+    }
     return res.json(status);
   } catch (error) {
     return handleError(error, res, next);

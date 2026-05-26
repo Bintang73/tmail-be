@@ -17,7 +17,7 @@ Backend inbound-only untuk temporary email. Sistem menerima SMTP via Haraka, mem
 - Worker cleanup file email lebih dari 1 hari.
 - WebSocket update inbox saat email masuk.
 - Admin API untuk tambah/hapus domain aktif dan hapus pesan.
-- Admin web `/admin` untuk mengatur whitelist IP akses API/WebSocket.
+- Admin web `/admin` untuk mengatur whitelist IP akses API HTTP.
 - Deteksi OTP otomatis dengan regex lokal, fallback OpenAI opsional, dan Redis template learning agar tidak hit AI terus-menerus untuk pola email yang sama.
 
 ## Setup
@@ -52,12 +52,12 @@ ADMIN_WEB_PASSWORD=password-kuat
 ADMIN_SESSION_SECRET=random-secret-panjang
 ```
 
-Menu `/admin` dipakai untuk memilih mode akses:
+Menu `/admin` dipakai untuk memilih mode akses API HTTP:
 
-- `All IP`: semua IP bisa akses API dan WebSocket.
-- `Whitelist only`: hanya IP di whitelist yang bisa akses API dan WebSocket.
+- `All IP`: semua IP bisa akses API HTTP.
+- `Whitelist only`: hanya IP di whitelist yang bisa akses API HTTP.
 
-Endpoint `/admin` sendiri selalu bisa diakses tanpa whitelist supaya admin tidak terkunci dari menu pengaturan.
+Endpoint `/admin` dan WebSocket `/ws` selalu bisa diakses tanpa whitelist supaya admin tidak terkunci dari menu pengaturan dan realtime inbox tetap berjalan.
 
 ## Cloudflare Tunnel
 
@@ -788,13 +788,13 @@ Response:
 }
 ```
 
-#### Random Public Domains
+#### Random Incoming Domains
 
 ```http
 GET /api/v1/random-domain
 ```
 
-Menampilkan domain public aktif secara acak, maksimal 10 domain.
+Menampilkan gabungan domain incoming yang MX-valid dan domain yang pernah dicek status lalu valid MX. Hasil diacak, maksimal 10 domain, dan domain yang sama hanya tampil sekali.
 
 Response:
 
@@ -803,16 +803,21 @@ Response:
   "domains": [
     {
       "domain": "thvuinin.my.id",
-      "visibility": "public",
-      "created_at": 0,
-      "updated_at": 0,
-      "built_in": true
+      "last_seen_at": 1779811148095,
+      "total_messages": 8,
+      "mx_valid": true,
+      "source": "incoming"
     }
   ],
-  "total_domains": 1,
+  "total_domains": 5,
   "limit": 10
 }
 ```
+
+Nilai `source`:
+
+- `incoming`: domain tercatat dari email inbound.
+- `mx_status`: domain tercatat dari hasil check status domain yang MX-valid.
 
 #### Check Domain Status
 

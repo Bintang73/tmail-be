@@ -3,7 +3,31 @@ import { getRedis } from '../storage/redis.js';
 import { getDomainFromEmail, isValidDomain, normalizeDomain, normalizeEmail } from '../utils/email.js';
 
 const incomingDomainsKey = 'domains:incoming:mx_valid';
+const checkedMxDomainsKey = 'domains:checked:mx_valid';
 const incomingDomainCountKey = (domain) => `domain_incoming_count:${normalizeDomain(domain)}`;
+
+const buildIncomingDomainRows = async (domainsWithScores, source = null) => {
+  const redis = getRedis();
+  const rows = [];
+
+  for (let index = 0; index < domainsWithScores.length; index += 2) {
+    const domain = domainsWithScores[index];
+    const row = {
+      domain,
+      last_seen_at: Number(domainsWithScores[index + 1] || 0),
+      total_messages: Number(await redis.get(incomingDomainCountKey(domain))) || 0,
+      mx_valid: true
+    };
+
+    if (source) {
+      row.source = source;
+    }
+
+    rows.push(row);
+  }
+
+  return rows;
+};
 
 const getMxConnectedDomains = async (domains) => {
   const connected = [];
@@ -49,6 +73,14 @@ export const trackIncomingDomains = async (emails = []) => {
   return connectedDomains;
 };
 
+export const trackCheckedMxDomain = async (domain) => {
+  const normalized = normalizeDomain(domain);
+  if (!isValidDomain(normalized)) return null;
+
+  await getRedis().zadd(checkedMxDomainsKey, Date.now(), normalized);
+  return normalized;
+};
+
 export const listIncomingDomains = async ({ page = 1, limit = 20 } = {}) => {
   const safePage = Math.max(1, Number.parseInt(page, 10) || 1);
   const safeLimit = Math.min(20, Math.max(1, Number.parseInt(limit, 10) || 20));
@@ -60,16 +92,7 @@ export const listIncomingDomains = async ({ page = 1, limit = 20 } = {}) => {
     redis.zrevrange(incomingDomainsKey, offset, offset + safeLimit - 1, 'WITHSCORES')
   ]);
 
-  const rows = [];
-  for (let index = 0; index < domains.length; index += 2) {
-    const domain = domains[index];
-    rows.push({
-      domain,
-      last_seen_at: Number(domains[index + 1] || 0),
-      total_messages: Number(await redis.get(incomingDomainCountKey(domain))) || 0,
-      mx_valid: true
-    });
-  }
+  const rows = await buildIncomingDomainRows(domains);
 
   const totalPages = Math.max(1, Math.ceil(total / safeLimit));
 
@@ -80,5 +103,40 @@ export const listIncomingDomains = async ({ page = 1, limit = 20 } = {}) => {
     total_pages: totalPages,
     last_page: totalPages,
     domains: rows
+  };
+};
+
+export const listRandomAvailableDomains = async ({ limit = 10 } = {}) => {
+  const safeLimit = Math.min(10, Math.max(1, Number.parseInt(limit, 10) || 10));
+  const redis = getRedis();
+  const [incomingDomains, checkedDomains] = await Promise.all([
+    redis.zrange(incomingDomainsKey, 0, -1, 'WITHSCORES'),
+    redis.zrange(checkedMxDomainsKey, 0, -1, 'WITHSCORES')
+  ]);
+  const rowsByDomain = new Map();
+  const incomingRows = await buildIncomingDomainRows(incomingDomains, 'incoming');
+  const checkedRows = await buildIncomingDomainRows(checkedDomains, 'mx_status');
+
+  for (const row of incomingRows) {
+    rowsByDomain.set(row.domain, row);
+  }
+
+  for (const row of checkedRows) {
+    if (!rowsByDomain.has(row.domain)) {
+      rowsByDomain.set(row.domain, row);
+    }
+  }
+
+  const rows = [...rowsByDomain.values()];
+
+  for (let index = rows.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [rows[index], rows[randomIndex]] = [rows[randomIndex], rows[index]];
+  }
+
+  return {
+    limit: safeLimit,
+    total_domains: rows.length,
+    domains: rows.slice(0, safeLimit)
   };
 };

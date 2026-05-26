@@ -94,7 +94,7 @@ const requireAdminSession = (req, res, next) => {
 const loginPage = (error = '') =>
   html(`<section>
     <h1>Admin Login</h1>
-    <p class="muted">Masuk untuk mengatur whitelist IP akses web/API.</p>
+    <p class="muted">Masuk untuk mengatur whitelist IP akses API HTTP.</p>
     ${error ? `<p class="error">${error}</p>` : ''}
     <form method="post" action="/admin/login">
       <label>Password</label>

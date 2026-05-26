@@ -41,7 +41,12 @@ export const openApiSpec = {
           domain: { type: 'string', example: 'example.com' },
           last_seen_at: { type: 'integer', format: 'int64' },
           total_messages: { type: 'integer', example: 12 },
-          mx_valid: { type: 'boolean', example: true }
+          mx_valid: { type: 'boolean', example: true },
+          source: {
+            type: 'string',
+            enum: ['incoming', 'mx_status'],
+            description: 'Present on /random-domain. incoming means seen from inbound email, mx_status means recorded from a valid domain status check.'
+          }
         }
       },
       PublicDomain: {
@@ -314,11 +319,12 @@ export const openApiSpec = {
     },
     '/random-domain': {
       get: {
-        summary: 'List up to 10 random public domains',
-        description: 'Returns active public domains in random order. Private domains are not included.',
+        summary: 'List up to 10 random incoming MX-valid domains',
+        description:
+          'Returns a random de-duplicated sample from MX-valid incoming domains and domains that were recorded from successful domain status checks. The result is capped at 10 domains.',
         responses: {
           200: {
-            description: 'Random public domains',
+            description: 'Random incoming domains',
             content: {
               'application/json': {
                 schema: {
@@ -327,7 +333,7 @@ export const openApiSpec = {
                     domains: {
                       type: 'array',
                       maxItems: 10,
-                      items: { $ref: '#/components/schemas/PublicDomain' }
+                      items: { $ref: '#/components/schemas/IncomingDomain' }
                     },
                     total_domains: { type: 'integer' },
                     limit: { type: 'integer', example: 10 }
@@ -337,13 +343,13 @@ export const openApiSpec = {
                   domains: [
                     {
                       domain: 'thvuinin.my.id',
-                      visibility: 'public',
-                      created_at: 0,
-                      updated_at: 0,
-                      built_in: true
+                      last_seen_at: 1779811148095,
+                      total_messages: 8,
+                      mx_valid: true,
+                      source: 'incoming'
                     }
                   ],
-                  total_domains: 1,
+                  total_domains: 5,
                   limit: 10
                 }
               }

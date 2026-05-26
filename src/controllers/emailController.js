@@ -1,20 +1,11 @@
 import { readEmailFileById } from '../services/fileStorageService.js';
 import { getDomainStatus, getPublicDomainForGenerate, listDomains } from '../services/domainService.js';
 import { getInboxMessages } from '../services/inboxService.js';
-import { listIncomingDomains } from '../services/incomingDomainService.js';
+import { listIncomingDomains, listRandomAvailableDomains, trackCheckedMxDomain } from '../services/incomingDomainService.js';
 import { deleteInboxEverywhere, deleteMessageEverywhere } from '../services/messageDeleteService.js';
 import { getSystemStatus } from '../services/systemStatusService.js';
 import { getRedis } from '../storage/redis.js';
 import { generateRandomEmail, isValidDomain, isValidEmail, normalizeDomain, normalizeEmail } from '../utils/email.js';
-
-const randomize = (items) => {
-  const shuffled = [...items];
-  for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    const randomIndex = Math.floor(Math.random() * (index + 1));
-    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
-  }
-  return shuffled;
-};
 
 export const generate = async (req, res, next) => {
   try {
@@ -100,14 +91,8 @@ export const publicDomains = async (req, res, next) => {
 
 export const randomDomains = async (req, res, next) => {
   try {
-    const domains = await listDomains({ includePrivate: false });
-    const randomDomains = randomize(domains).slice(0, 10);
-
-    return res.json({
-      domains: randomDomains,
-      total_domains: domains.length,
-      limit: 10
-    });
+    const result = await listRandomAvailableDomains({ limit: 10 });
+    return res.json(result);
   } catch (error) {
     return next(error);
   }
@@ -134,6 +119,9 @@ export const domainStatus = async (req, res, next) => {
     }
 
     const status = await getDomainStatus(domain);
+    if (status.mx_valid) {
+      await trackCheckedMxDomain(status.domain);
+    }
     return res.json(status);
   } catch (error) {
     return next(error);
