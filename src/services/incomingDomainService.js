@@ -8,14 +8,27 @@ const incomingDomainCountKey = (domain) => `domain_incoming_count:${normalizeDom
 
 const buildIncomingDomainRows = async (domainsWithScores, source = null) => {
   const redis = getRedis();
-  const rows = [];
+  const domains = [];
+  const scoresByDomain = new Map();
 
   for (let index = 0; index < domainsWithScores.length; index += 2) {
     const domain = domainsWithScores[index];
+    domains.push(domain);
+    scoresByDomain.set(domain, Number(domainsWithScores[index + 1] || 0));
+  }
+
+  const countResults = domains.length
+    ? await redis.pipeline(domains.map((domain) => ['get', incomingDomainCountKey(domain)])).exec()
+    : [];
+  const rows = [];
+
+  for (let index = 0; index < domains.length; index += 1) {
+    const domain = domains[index];
+    const [, count] = countResults[index] || [];
     const row = {
       domain,
-      last_seen_at: Number(domainsWithScores[index + 1] || 0),
-      total_messages: Number(await redis.get(incomingDomainCountKey(domain))) || 0,
+      last_seen_at: scoresByDomain.get(domain) || 0,
+      total_messages: Number(count) || 0,
       mx_valid: true
     };
 
