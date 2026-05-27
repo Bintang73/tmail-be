@@ -32,7 +32,9 @@ export const openApiSpec = {
           id: { type: 'string', format: 'uuid' },
           from: { type: 'string' },
           subject: { type: 'string' },
-          timestamp: { type: 'integer', format: 'int64' }
+          timestamp: { type: 'integer', format: 'int64' },
+          is_otp: { type: 'boolean', example: true },
+          otp: { type: 'string', nullable: true, example: '123456' }
         }
       },
       IncomingDomain: {

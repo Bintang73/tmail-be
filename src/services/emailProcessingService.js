@@ -41,7 +41,9 @@ export const processRawEmail = async ({ raw, recipients }) => {
     id,
     from: message.from,
     subject: message.subject,
-    timestamp: createdAt
+    timestamp: createdAt,
+    is_otp: Boolean(message.is_otp),
+    otp: message.is_otp ? message.otp || null : null
   };
 
   for (const email of toAddresses) {

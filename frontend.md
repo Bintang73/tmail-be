@@ -208,7 +208,9 @@ Response:
       "id": "d2fb0b7c-7a8d-4fb0-bc37-4e0f95f67d3b",
       "from": "Service <no-reply@example.com>",
       "subject": "Your verification code",
-      "timestamp": 1710000000000
+      "timestamp": 1710000000000,
+      "is_otp": true,
+      "otp": "123456"
     }
   ]
 }
@@ -219,6 +221,7 @@ Frontend behavior:
 - Sort order sudah dari backend list Redis terbaru di depan.
 - Klik item message untuk fetch detail.
 - Tampilkan waktu dari `timestamp`.
+- Jika `is_otp=true`, tampilkan `otp` langsung di list inbox tanpa fetch detail message.
 - Handle empty list.
 
 ### Read Message Detail
@@ -689,7 +692,9 @@ Event message:
     "id": "uuid",
     "from": "sender@example.com",
     "subject": "Hello",
-    "timestamp": 1710000000000
+    "timestamp": 1710000000000,
+    "is_otp": false,
+    "otp": null
   }
 }
 ```
@@ -699,6 +704,7 @@ Frontend behavior:
 - Connect setelah email aktif tersedia.
 - Jika email berubah, close socket lama dan buka socket baru.
 - Saat event masuk, prepend message ke inbox list.
+- Jika `message.is_otp=true`, tampilkan `message.otp` langsung dari event.
 - Tetap sediakan fallback polling jika socket gagal.
 - Handle close code `1008` untuk email invalid.
 

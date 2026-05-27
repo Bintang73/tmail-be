@@ -44,7 +44,14 @@ export const addInboxMessage = async (email, message) => {
 export const getInboxMessages = async (email) => {
   const redis = getRedis();
   const rows = await redis.lrange(inboxKey(email), 0, config.inboxMaxMessages - 1);
-  return rows.map((row) => JSON.parse(row));
+  return rows.map((row) => {
+    const message = JSON.parse(row);
+    return {
+      ...message,
+      is_otp: Boolean(message.is_otp),
+      otp: message.is_otp ? message.otp || null : null
+    };
+  });
 };
 
 export const removeMessageFromInbox = async (email, messageId) => {

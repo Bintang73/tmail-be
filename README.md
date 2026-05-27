@@ -605,7 +605,9 @@ Response:
       "id": "d2fb0b7c-7a8d-4fb0-bc37-4e0f95f67d3b",
       "from": "Service <no-reply@example.com>",
       "subject": "Your verification code",
-      "timestamp": 1710000000000
+      "timestamp": 1710000000000,
+      "is_otp": true,
+      "otp": "123456"
     }
   ]
 }
@@ -1160,7 +1162,9 @@ Saat email masuk, server mengirim event:
     "id": "uuid",
     "from": "sender@example.com",
     "subject": "Hello",
-    "timestamp": 1710000000000
+    "timestamp": 1710000000000,
+    "is_otp": false,
+    "otp": null
   }
 }
 ```
