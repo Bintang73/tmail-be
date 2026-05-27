@@ -1,4 +1,5 @@
 import { config } from '../utils/config.js';
+import { readEmailFileById } from './fileStorageService.js';
 import { getDomainFromEmail, normalizeDomain, normalizeEmail } from '../utils/email.js';
 import { getRedis } from '../storage/redis.js';
 
@@ -44,14 +45,25 @@ export const addInboxMessage = async (email, message) => {
 export const getInboxMessages = async (email) => {
   const redis = getRedis();
   const rows = await redis.lrange(inboxKey(email), 0, config.inboxMaxMessages - 1);
-  return rows.map((row) => {
+  return Promise.all(rows.map(async (row) => {
     const message = JSON.parse(row);
+    if (!Object.hasOwn(message, 'is_otp') || !Object.hasOwn(message, 'otp')) {
+      const detail = await readEmailFileById(message.id).catch(() => null);
+      if (detail) {
+        return {
+          ...message,
+          is_otp: Boolean(detail.is_otp),
+          otp: detail.is_otp ? detail.otp || null : null
+        };
+      }
+    }
+
     return {
       ...message,
       is_otp: Boolean(message.is_otp),
       otp: message.is_otp ? message.otp || null : null
     };
-  });
+  }));
 };
 
 export const removeMessageFromInbox = async (email, messageId) => {
